@@ -95,6 +95,37 @@ class PermissionService {
     }
   }
 
+  // ==================== Journal d'appels ====================
+
+  /// Demande la permission de lecture du journal d'appels
+  Future<bool> requestCallLogPermission() async {
+    try {
+      final status = await Permission.phone.request();
+      return status.isGranted;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Vérifie si la permission de lecture du journal d'appels est accordée
+  Future<bool> checkCallLogPermission() async {
+    try {
+      final status = await Permission.phone.status;
+      return status.isGranted;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Retourne le statut de la permission de lecture du journal d'appels
+  Future<PermissionStatus> getCallLogPermissionStatus() async {
+    try {
+      return await Permission.phone.status;
+    } catch (e) {
+      return PermissionStatus.denied;
+    }
+  }
+
   // ==================== Utilitaires ====================
 
   /// Ouvre les paramètres de l'application

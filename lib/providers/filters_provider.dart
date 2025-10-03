@@ -10,6 +10,7 @@ class FiltersProvider extends ChangeNotifier {
   CallFrequency? _selectedFrequency;
   Priority? _selectedPriority;
   bool _showOnlyBirthdays = false;
+  bool _hideUpToDate = true; // NOUVEAU : masquer les contacts à jour par défaut
 
   // Filtres multiples
   final Set<ContactCategory> _selectedCategories = {};
@@ -20,6 +21,7 @@ class FiltersProvider extends ChangeNotifier {
   CallFrequency? get selectedFrequency => _selectedFrequency;
   Priority? get selectedPriority => _selectedPriority;
   bool get showOnlyBirthdays => _showOnlyBirthdays;
+  bool get hideUpToDate => _hideUpToDate;
 
   Set<ContactCategory> get selectedCategories => _selectedCategories;
   Set<CallFrequency> get selectedFrequencies => _selectedFrequencies;
@@ -52,6 +54,18 @@ class FiltersProvider extends ChangeNotifier {
   /// Définit le filtre anniversaires
   void setShowOnlyBirthdays(bool value) {
     _showOnlyBirthdays = value;
+    notifyListeners();
+  }
+
+  /// Active/désactive le filtre "masquer les contacts à jour"
+  void toggleHideUpToDate() {
+    _hideUpToDate = !_hideUpToDate;
+    notifyListeners();
+  }
+
+  /// Définit le filtre "masquer les contacts à jour"
+  void setHideUpToDate(bool value) {
+    _hideUpToDate = value;
     notifyListeners();
   }
 
@@ -137,6 +151,17 @@ class FiltersProvider extends ChangeNotifier {
           .toList();
     }
 
+    // Filtre "masquer les contacts à jour" - NOUVEAU
+    if (_hideUpToDate) {
+      filtered = filtered
+          .where((contact) {
+            final priority = calculatePriority(contact);
+            // Garder haute, moyenne et anniversaire, masquer basse (à jour)
+            return priority != Priority.low;
+          })
+          .toList();
+    }
+
     // Filtre anniversaires uniquement
     if (_showOnlyBirthdays) {
       filtered = filtered
@@ -157,6 +182,7 @@ class FiltersProvider extends ChangeNotifier {
     _selectedFrequency = null;
     _selectedPriority = null;
     _showOnlyBirthdays = false;
+    _hideUpToDate = true; // Garder ce filtre actif par défaut
     _selectedCategories.clear();
     _selectedFrequencies.clear();
     _selectedPriorities.clear();
@@ -169,6 +195,7 @@ class FiltersProvider extends ChangeNotifier {
         _selectedFrequency != null ||
         _selectedPriority != null ||
         _showOnlyBirthdays ||
+        _hideUpToDate ||
         _selectedCategories.isNotEmpty ||
         _selectedFrequencies.isNotEmpty ||
         _selectedPriorities.isNotEmpty;
@@ -181,6 +208,7 @@ class FiltersProvider extends ChangeNotifier {
     if (_selectedFrequency != null) count++;
     if (_selectedPriority != null) count++;
     if (_showOnlyBirthdays) count++;
+    if (_hideUpToDate) count++; // Compter le filtre "À contacter"
     count += _selectedCategories.length;
     count += _selectedFrequencies.length;
     count += _selectedPriorities.length;

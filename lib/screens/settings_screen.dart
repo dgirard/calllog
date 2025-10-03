@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/backup_service.dart';
+import '../services/call_log_service.dart';
 
 /// Écran des paramètres
 class SettingsScreen extends StatefulWidget {
@@ -11,8 +12,11 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final BackupService _backupService = BackupService();
+  final CallLogService _callLogService = CallLogService();
   bool _isLoading = false;
   Map<String, int>? _stats;
+  DateTime? _lastSyncTime;
+  int _syncDays = 7;
 
   @override
   void initState() {
@@ -111,6 +115,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _syncCalls() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final synced = await _callLogService.syncCallsWithTrackedContacts(
+        since: DateTime.now().subtract(Duration(days: _syncDays)),
+      );
+
+      setState(() => _lastSyncTime = DateTime.now());
+      await _loadStats();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$synced appel(s) synchronisé(s)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la synchronisation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,6 +158,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
+                // Section Synchronisation
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Synchronisation des appels',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                // Dernière synchronisation
+                if (_lastSyncTime != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Dernière sync: ${_lastSyncTime!.day}/${_lastSyncTime!.month} à ${_lastSyncTime!.hour}:${_lastSyncTime!.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+
+                // Bouton synchroniser
+                ListTile(
+                  leading: const Icon(Icons.sync, color: Colors.blue),
+                  title: const Text('Synchroniser maintenant'),
+                  subtitle: Text('Analyser les $_syncDays derniers jours'),
+                  onTap: _syncCalls,
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+
+                // Période de synchronisation
+                ListTile(
+                  leading: const Icon(Icons.calendar_today),
+                  title: const Text('Période de synchronisation'),
+                  subtitle: Text('$_syncDays jours'),
+                  trailing: DropdownButton<int>(
+                    value: _syncDays,
+                    items: const [
+                      DropdownMenuItem(value: 7, child: Text('7 jours')),
+                      DropdownMenuItem(value: 14, child: Text('14 jours')),
+                      DropdownMenuItem(value: 30, child: Text('30 jours')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _syncDays = value);
+                      }
+                    },
+                  ),
+                ),
+
+                const Divider(),
+
                 // Section Sauvegarde
                 const Padding(
                   padding: EdgeInsets.all(16),

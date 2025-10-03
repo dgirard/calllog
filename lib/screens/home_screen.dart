@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/filters_provider.dart';
 import '../services/communication_service.dart';
+import '../services/call_log_service.dart';
 import '../widgets/contact_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/filter_chips.dart';
@@ -18,14 +19,48 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final CommunicationService _communicationService = CommunicationService();
+  final CallLogService _callLogService = CallLogService();
 
   @override
   void initState() {
     super.initState();
     // Charger les contacts au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ContactsProvider>().loadContacts();
+      _initializeData();
     });
+  }
+
+  Future<void> _initializeData() async {
+    // Charger les contacts
+    await context.read<ContactsProvider>().loadContacts();
+
+    // Synchroniser les appels en arrière-plan
+    _syncCallsInBackground();
+  }
+
+  Future<void> _syncCallsInBackground() async {
+    try {
+      // Synchroniser depuis les 7 derniers jours
+      final synced = await _callLogService.syncCallsWithTrackedContacts(
+        since: DateTime.now().subtract(const Duration(days: 7)),
+      );
+
+      if (synced > 0 && mounted) {
+        // Recharger les contacts pour afficher les mises à jour
+        await context.read<ContactsProvider>().loadContacts();
+
+        // Afficher une notification discrète
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$synced appel(s) synchronisé(s)'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Erreur silencieuse, ne pas déranger l'utilisateur
+    }
   }
 
   Future<void> _refreshContacts() async {

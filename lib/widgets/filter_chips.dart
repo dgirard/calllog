@@ -15,24 +15,22 @@ class FilterChips extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              // Bouton Tous (pour désactiver tous les filtres)
-              if (filtersProvider.hasActiveFilters)
-                FilterChip(
-                  label: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.clear_all, size: 16),
-                      SizedBox(width: 4),
-                      Text('Tous'),
-                    ],
-                  ),
-                  selected: false,
-                  onSelected: (_) => filtersProvider.resetFilters(),
-                  backgroundColor: Colors.grey.shade200,
+              // Chip "À contacter" (masquer les contacts à jour)
+              FilterChip(
+                label: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notifications_active, size: 16),
+                    SizedBox(width: 4),
+                    Text('À contacter'),
+                  ],
                 ),
+                selected: filtersProvider.hideUpToDate,
+                onSelected: (_) => filtersProvider.toggleHideUpToDate(),
+                selectedColor: Colors.orange.shade100,
+              ),
 
-              if (filtersProvider.hasActiveFilters)
-                const SizedBox(width: 8),
+              const SizedBox(width: 8),
 
               // Chip Anniversaires
               FilterChip(
