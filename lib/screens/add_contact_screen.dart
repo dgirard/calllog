@@ -58,7 +58,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
         return;
       }
 
-      final contacts = await _contactsService.getAllContacts();
+      final contacts = await _contactsService.getAndroidContacts();
       if (!mounted) return;
 
       // Afficher le sélecteur de contact

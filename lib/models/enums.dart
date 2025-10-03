@@ -99,6 +99,19 @@ extension PriorityExtension on Priority {
       orElse: () => Priority.low,
     );
   }
+
+  String get displayName {
+    switch (this) {
+      case Priority.high:
+        return 'Haute';
+      case Priority.medium:
+        return 'Moyenne';
+      case Priority.low:
+        return 'Basse';
+      case Priority.birthday:
+        return 'Anniversaire';
+    }
+  }
 }
 
 extension ContactMethodExtension on ContactMethod {

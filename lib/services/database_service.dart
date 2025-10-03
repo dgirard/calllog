@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/tracked_contact.dart';
 import '../models/contact_record.dart';
+import '../models/enums.dart';
 
 /// Service singleton pour gérer la base de données SQLite
 class DatabaseService {
@@ -117,6 +118,11 @@ class DatabaseService {
     }
   }
 
+  /// Récupère un contact par son ID (alias pour compatibilité)
+  Future<TrackedContact?> getTrackedContactById(int id) async {
+    return getContactById(id);
+  }
+
   /// Met à jour un contact existant
   Future<int> updateContact(TrackedContact contact) async {
     try {
@@ -130,6 +136,11 @@ class DatabaseService {
     } catch (e) {
       throw Exception('Erreur lors de la mise à jour du contact: $e');
     }
+  }
+
+  /// Met à jour un contact existant (alias pour compatibilité)
+  Future<int> updateTrackedContact(TrackedContact contact) async {
+    return updateContact(contact);
   }
 
   /// Supprime un contact et son historique
@@ -230,6 +241,36 @@ class DatabaseService {
       );
     } catch (e) {
       throw Exception('Erreur lors de la suppression de l\'enregistrement: $e');
+    }
+  }
+
+  /// Enregistre un contact avec toutes les métadonnées
+  Future<void> recordContact({
+    required int trackedContactId,
+    required ContactMethod contactMethod,
+    required ContactContext context,
+  }) async {
+    try {
+      final now = DateTime.now();
+
+      final record = ContactRecord(
+        trackedContactId: trackedContactId,
+        contactDate: now,
+        contactMethod: contactMethod,
+        contactType: contactMethod.toJson(), // compatibility
+        context: context,
+      );
+
+      await insertContactRecord(record);
+
+      // Mettre à jour la date de dernier contact
+      final contact = await getContactById(trackedContactId);
+      if (contact != null) {
+        final updatedContact = contact.copyWith(lastContactDate: now);
+        await updateContact(updatedContact);
+      }
+    } catch (e) {
+      throw Exception('Erreur lors de l\'enregistrement du contact: $e');
     }
   }
 

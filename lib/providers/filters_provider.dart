@@ -11,10 +11,19 @@ class FiltersProvider extends ChangeNotifier {
   Priority? _selectedPriority;
   bool _showOnlyBirthdays = false;
 
+  // Filtres multiples
+  final Set<ContactCategory> _selectedCategories = {};
+  final Set<CallFrequency> _selectedFrequencies = {};
+  final Set<Priority> _selectedPriorities = {};
+
   ContactCategory? get selectedCategory => _selectedCategory;
   CallFrequency? get selectedFrequency => _selectedFrequency;
   Priority? get selectedPriority => _selectedPriority;
   bool get showOnlyBirthdays => _showOnlyBirthdays;
+
+  Set<ContactCategory> get selectedCategories => _selectedCategories;
+  Set<CallFrequency> get selectedFrequencies => _selectedFrequencies;
+  Set<Priority> get selectedPriorities => _selectedPriorities;
 
   /// Change le filtre de catégorie
   void setCategory(ContactCategory? category) {
@@ -46,30 +55,84 @@ class FiltersProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Active/désactive une catégorie dans les filtres multiples
+  void toggleCategory(ContactCategory category) {
+    if (_selectedCategories.contains(category)) {
+      _selectedCategories.remove(category);
+    } else {
+      _selectedCategories.add(category);
+    }
+    notifyListeners();
+  }
+
+  /// Active/désactive une fréquence dans les filtres multiples
+  void toggleFrequency(CallFrequency frequency) {
+    if (_selectedFrequencies.contains(frequency)) {
+      _selectedFrequencies.remove(frequency);
+    } else {
+      _selectedFrequencies.add(frequency);
+    }
+    notifyListeners();
+  }
+
+  /// Active/désactive une priorité dans les filtres multiples
+  void togglePriority(Priority priority) {
+    if (_selectedPriorities.contains(priority)) {
+      _selectedPriorities.remove(priority);
+    } else {
+      _selectedPriorities.add(priority);
+    }
+    notifyListeners();
+  }
+
   /// Applique les filtres à une liste de contacts
   List<TrackedContact> applyFilters(List<TrackedContact> contacts) {
     var filtered = contacts.toList();
 
-    // Filtre par catégorie
+    // Filtre par catégorie (simple)
     if (_selectedCategory != null) {
       filtered = filtered
           .where((contact) => contact.category == _selectedCategory)
           .toList();
     }
 
-    // Filtre par fréquence
+    // Filtre par catégories multiples
+    if (_selectedCategories.isNotEmpty) {
+      filtered = filtered
+          .where((contact) => _selectedCategories.contains(contact.category))
+          .toList();
+    }
+
+    // Filtre par fréquence (simple)
     if (_selectedFrequency != null) {
       filtered = filtered
           .where((contact) => contact.frequency == _selectedFrequency)
           .toList();
     }
 
-    // Filtre par priorité
+    // Filtre par fréquences multiples
+    if (_selectedFrequencies.isNotEmpty) {
+      filtered = filtered
+          .where((contact) => _selectedFrequencies.contains(contact.frequency))
+          .toList();
+    }
+
+    // Filtre par priorité (simple)
     if (_selectedPriority != null) {
       filtered = filtered
           .where((contact) {
             final priority = calculatePriority(contact);
             return priority == _selectedPriority;
+          })
+          .toList();
+    }
+
+    // Filtre par priorités multiples
+    if (_selectedPriorities.isNotEmpty) {
+      filtered = filtered
+          .where((contact) {
+            final priority = calculatePriority(contact);
+            return _selectedPriorities.contains(priority);
           })
           .toList();
     }
@@ -94,6 +157,9 @@ class FiltersProvider extends ChangeNotifier {
     _selectedFrequency = null;
     _selectedPriority = null;
     _showOnlyBirthdays = false;
+    _selectedCategories.clear();
+    _selectedFrequencies.clear();
+    _selectedPriorities.clear();
     notifyListeners();
   }
 
@@ -102,7 +168,10 @@ class FiltersProvider extends ChangeNotifier {
     return _selectedCategory != null ||
         _selectedFrequency != null ||
         _selectedPriority != null ||
-        _showOnlyBirthdays;
+        _showOnlyBirthdays ||
+        _selectedCategories.isNotEmpty ||
+        _selectedFrequencies.isNotEmpty ||
+        _selectedPriorities.isNotEmpty;
   }
 
   /// Compte le nombre de filtres actifs
@@ -112,6 +181,9 @@ class FiltersProvider extends ChangeNotifier {
     if (_selectedFrequency != null) count++;
     if (_selectedPriority != null) count++;
     if (_showOnlyBirthdays) count++;
+    count += _selectedCategories.length;
+    count += _selectedFrequencies.length;
+    count += _selectedPriorities.length;
     return count;
   }
 }
