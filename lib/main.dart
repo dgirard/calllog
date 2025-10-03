@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/add_contact_screen.dart';
 import 'screens/contact_detail_screen.dart';
 import 'screens/filters_screen.dart';
+import 'screens/settings_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -62,6 +63,11 @@ class MyApp extends StatelessWidget {
             case '/filters':
               return MaterialPageRoute(
                 builder: (_) => const FiltersScreen(),
+              );
+
+            case '/settings':
+              return MaterialPageRoute(
+                builder: (_) => const SettingsScreen(),
               );
 
             default:
