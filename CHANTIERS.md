@@ -18,12 +18,12 @@ calllog/
 │   ├── main.dart
 │   ├── models/
 │   │   ├── tracked_contact.dart
-│   │   ├── call_record.dart
+│   │   ├── contact_record.dart
 │   │   └── enums.dart
 │   ├── services/
 │   │   ├── database_service.dart
 │   │   ├── contacts_service.dart
-│   │   ├── call_service.dart
+│   │   ├── communication_service.dart
 │   │   └── permission_service.dart
 │   ├── providers/
 │   │   ├── contacts_provider.dart
@@ -37,10 +37,12 @@ calllog/
 │   │   ├── contact_card.dart
 │   │   ├── priority_indicator.dart
 │   │   ├── filter_chips.dart
-│   │   └── empty_state.dart
+│   │   ├── empty_state.dart
+│   │   └── birthday_badge.dart
 │   └── utils/
 │       ├── constants.dart
 │       ├── date_utils.dart
+│       ├── birthday_utils.dart
 │       └── priority_calculator.dart
 ├── android/
 │   └── app/
@@ -74,6 +76,7 @@ Créer le projet Flutter avec la structure de base et les dépendances.
    ```xml
    <uses-permission android:name="android.permission.READ_CONTACTS" />
    <uses-permission android:name="android.permission.CALL_PHONE" />
+   <uses-permission android:name="android.permission.SEND_SMS" />
    ```
 5. Créer un `README.md` basique avec description du projet
 6. Tester que le projet compile : `flutter pub get && flutter build apk --debug`
@@ -96,15 +99,22 @@ Créer les modèles de données pour les contacts et l'historique.
 1. Créer `lib/models/enums.dart` :
    - Enum `CallFrequency` (weekly, biweekly, monthly, quarterly, yearly)
    - Enum `ContactCategory` (family, friends, professional)
-   - Enum `Priority` (high, medium, low)
+   - Enum `Priority` (high, medium, low, birthday)
+   - **Enum `ContactMethod` (call, sms)**
+   - **Enum `ContactContext` (normal, birthday)**
 
 2. Créer `lib/models/tracked_contact.dart` :
-   - Classe `TrackedContact` avec tous les champs
+   - Classe `TrackedContact` avec tous les champs incluant :
+     - **birthday (DateTime? nullable)** - date d'anniversaire
    - Méthodes `toMap()` et `fromMap()` pour SQLite
    - Méthode `copyWith()`
 
-3. Créer `lib/models/call_record.dart` :
-   - Classe `CallRecord` avec les champs
+3. Créer `lib/models/contact_record.dart` (anciennement call_record.dart) :
+   - Classe `ContactRecord` avec les champs :
+     - id, trackedContactId, contactDate
+     - **contactMethod (ContactMethod)** - appel ou SMS
+     - contactType (manual/automatic)
+     - **context (ContactContext)** - normal ou anniversaire
    - Méthodes `toMap()` et `fromMap()`
 
 4. Ajouter des commentaires de documentation pour chaque classe
@@ -125,16 +135,20 @@ Implémenter SQLite pour stocker les contacts et l'historique.
 ### Tâches
 1. Créer `lib/services/database_service.dart` :
    - Singleton pour gérer la connexion SQLite
-   - Méthode `initDatabase()` créant les tables `tracked_contacts` et `call_history`
+   - Méthode `initDatabase()` créant les tables :
+     - `tracked_contacts` avec colonne **birthday (TEXT nullable)**
+     - `contact_history` (anciennement call_history) avec colonnes :
+       - **contact_method (TEXT)** - "call" ou "sms"
+       - **context (TEXT)** - "normal" ou "birthday"
    - CRUD pour `tracked_contacts` :
      - `insertContact(TrackedContact contact)`
      - `getContacts()`
      - `updateContact(TrackedContact contact)`
      - `deleteContact(int id)`
-   - CRUD pour `call_history` :
-     - `insertCallRecord(CallRecord record)`
-     - `getCallHistory(int contactId)`
-     - `deleteCallHistory(int contactId)`
+   - CRUD pour `contact_history` :
+     - `insertContactRecord(ContactRecord record)`
+     - `getContactHistory(int contactId)`
+     - `deleteContactHistory(int contactId)`
 
 2. Ajouter la gestion des erreurs avec try-catch
 3. Tester la compilation
@@ -155,19 +169,28 @@ Créer la logique de calcul de priorité et formatage des dates.
 ### Tâches
 1. Créer `lib/utils/constants.dart` :
    - Constantes pour les durées (7, 14, 30, 90, 365 jours)
-   - Constantes de couleurs pour les priorités
+   - Constantes de couleurs pour les priorités (incluant couleur anniversaire)
+   - **Constante pour seuil anniversaire proche (7 jours)**
+   - **Message SMS d'anniversaire par défaut**
    - Constantes de textes
 
 2. Créer `lib/utils/date_utils.dart` :
    - Fonction `formatDate(DateTime date)` pour affichage
-   - Fonction `daysSinceLastCall(DateTime? lastCall)`
+   - Fonction `daysSinceLastContact(DateTime? lastContact)`
 
-3. Créer `lib/utils/priority_calculator.dart` :
+3. Créer `lib/utils/birthday_utils.dart` :
+   - **Fonction `getNextBirthday(DateTime birthday)` retournant prochain anniversaire**
+   - **Fonction `daysUntilBirthday(DateTime? birthday)` retournant nombre de jours**
+   - **Fonction `isBirthdayToday(DateTime? birthday)` retournant bool**
+   - **Fonction `isBirthdaySoon(DateTime? birthday)` (dans les 7 jours)**
+
+4. Créer `lib/utils/priority_calculator.dart` :
    - Fonction `calculatePriority(TrackedContact contact)` retournant Priority
-   - Fonction `getDaysUntilNextCall(TrackedContact contact)`
+     - **Vérifier d'abord si anniversaire aujourd'hui → Priority.birthday**
+   - Fonction `getDaysUntilNextContact(TrackedContact contact)`
    - Fonction `getExpectedDelay(CallFrequency frequency)` en jours
 
-4. Ajouter des tests unitaires dans `test/priority_calculator_test.dart`
+5. Ajouter des tests unitaires dans `test/priority_calculator_test.dart` et `test/birthday_utils_test.dart`
 
 ### Commit
 ```
@@ -186,6 +209,7 @@ Gérer les permissions Android (contacts et appels).
 1. Créer `lib/services/permission_service.dart` :
    - Méthode `requestContactsPermission()` retournant bool
    - Méthode `requestCallPermission()` retournant bool
+   - **Méthode `requestSmsPermission()` retournant bool**
    - Méthode `checkContactsPermission()` (vérification sans demande)
    - Méthode `openAppSettings()` si permissions refusées définitivement
 
@@ -208,6 +232,7 @@ Accéder au répertoire de contacts Android.
 ### Tâches
 1. Créer `lib/services/contacts_service.dart` :
    - Méthode `getAndroidContacts()` retournant List de contacts natifs
+   - **Méthode `getContactBirthday(Contact contact)` pour récupérer anniversaire si disponible**
    - Méthode `searchContacts(String query)` pour recherche
    - Gestion des permissions avant accès
    - Gestion des erreurs
@@ -222,16 +247,18 @@ git commit -m "chantier 6: service d'accès aux contacts Android"
 
 ---
 
-## CHANTIER 7 : Service d'appels téléphoniques
+## CHANTIER 7 : Service de communication (appels et SMS)
 
 ### Objectif
-Lancer des appels et enregistrer l'historique.
+Lancer des appels, envoyer des SMS et enregistrer l'historique.
 
 ### Tâches
-1. Créer `lib/services/call_service.dart` :
-   - Méthode `makeCall(String phoneNumber)` utilisant url_launcher
-   - Méthode `recordCall(int contactId)` enregistrant dans la BDD
-   - Gestion des permissions avant appel
+1. Créer `lib/services/communication_service.dart` (anciennement call_service.dart) :
+   - **Méthode `makeCall(String phoneNumber)` utilisant url_launcher (tel:)**
+   - **Méthode `sendSms(String phoneNumber, {String? message})` utilisant url_launcher (sms:)**
+   - **Méthode `sendBirthdaySms(String phoneNumber, String firstName)` avec message pré-rempli**
+   - **Méthode `recordContact(int contactId, ContactMethod method, ContactContext context)`**
+   - Gestion des permissions avant appel/SMS
    - Gestion des erreurs
 
 2. Tester la compilation
@@ -239,7 +266,7 @@ Lancer des appels et enregistrer l'historique.
 ### Commit
 ```
 git add .
-git commit -m "chantier 7: service d'appels téléphoniques et enregistrement"
+git commit -m "chantier 7: service de communication (appels et SMS) et enregistrement"
 ```
 
 ---
@@ -257,8 +284,12 @@ Gérer l'état des contacts suivis avec Provider.
    - Méthode `addContact(TrackedContact contact)`
    - Méthode `updateContact(TrackedContact contact)`
    - Méthode `deleteContact(int id)`
-   - Méthode `recordCall(int contactId)`
-   - Méthode `getSortedContacts()` triée par priorité
+   - **Méthode `recordContact(int contactId, ContactMethod method, ContactContext context)`**
+   - **Méthode `getSortedContacts()` triée par :**
+     - **1. Anniversaire aujourd'hui (Priority.birthday)**
+     - **2. Anniversaire dans 7 jours (avec badge)**
+     - **3. Priorité contact (high → low)**
+     - **4. Délai écoulé**
    - Appeler `notifyListeners()` après chaque modification
 
 2. Tester la compilation
@@ -280,8 +311,11 @@ Gérer l'état des filtres de la liste.
 1. Créer `lib/providers/filters_provider.dart` :
    - Classe `FiltersProvider extends ChangeNotifier`
    - Propriétés : `selectedCategory`, `selectedFrequency`, `selectedPriority`
+   - **Propriété `showOnlyBirthdays` (bool)** - filtre anniversaires uniquement
    - Méthodes pour changer chaque filtre
+   - **Méthode `toggleBirthdaysFilter()`**
    - Méthode `applyFilters(List<TrackedContact> contacts)` retournant liste filtrée
+     - **Inclure logique de filtrage par anniversaire proche**
    - Méthode `resetFilters()`
 
 2. Tester la compilation
@@ -304,18 +338,26 @@ Créer les widgets personnalisés pour l'UI.
    - Widget affichant une pastille de couleur selon Priority
    - Utiliser les constantes de couleurs
 
-2. Créer `lib/widgets/contact_card.dart` :
-   - Card affichant un TrackedContact
-   - Photo, nom, catégorie, dernière date d'appel
-   - PriorityIndicator intégré
-   - Actions : tap pour appeler, bouton "Appelé", bouton détails
+2. **Créer `lib/widgets/birthday_badge.dart` :**
+   - **Widget affichant badge anniversaire (icône gâteau 🎂)**
+   - **Afficher si anniversaire aujourd'hui ou dans les 7 jours**
+   - **Afficher nombre de jours restants**
 
-3. Créer `lib/widgets/empty_state.dart` :
+3. Créer `lib/widgets/contact_card.dart` :
+   - Card affichant un TrackedContact
+   - Photo, nom, catégorie, dernière date de contact
+   - PriorityIndicator intégré
+   - **BirthdayBadge si anniversaire proche**
+   - **Actions : boutons Téléphone et SMS**
+   - **Menu contextuel au tap : Appeler / SMS / Marquer contacté**
+
+4. Créer `lib/widgets/empty_state.dart` :
    - Widget affiché quand liste vide
    - Message + icône + bouton CTA
 
-4. Créer `lib/widgets/filter_chips.dart` :
+5. Créer `lib/widgets/filter_chips.dart` :
    - Chips pour filtrage rapide
+   - **Inclure chip/toggle "Anniversaires"**
    - Utilise FiltersProvider
 
 5. Tester la compilation
@@ -366,6 +408,8 @@ Permettre d'ajouter un contact depuis le répertoire Android.
    - Sélection d'un contact ouvre un formulaire :
      - Dropdown pour fréquence (CallFrequency)
      - Dropdown/Radio pour catégorie (ContactCategory)
+     - **DatePicker pour date d'anniversaire (optionnel)**
+     - **Tentative d'import automatique anniversaire depuis contact Android**
      - Bouton "Ajouter au suivi"
    - Vérifier permissions avant d'accéder aux contacts
    - Gérer le cas où permissions refusées
@@ -390,13 +434,18 @@ Afficher les détails et l'historique d'un contact.
 1. Créer `lib/screens/contact_detail_screen.dart` :
    - AppBar avec nom du contact et bouton supprimer
    - Section informations : photo, nom, téléphone, catégorie, fréquence
+   - **Affichage anniversaire avec âge si disponible**
    - Indicateur de priorité
-   - Bouton "Appeler maintenant"
-   - Bouton "Marquer comme appelé"
-   - Section "Historique des appels" :
-     - Liste des CallRecord depuis la BDD
-     - Affichage date et heure de chaque appel
-   - Bouton "Modifier" pour éditer fréquence/catégorie
+   - **Section "Actions rapides" :**
+     - **Bouton "Appeler"**
+     - **Bouton "SMS"**
+     - **Si anniversaire proche : bouton "SMS d'anniversaire" avec message pré-rempli**
+   - Bouton "Marquer comme contacté"
+   - **Section "Historique des contacts" :**
+     - **Liste des ContactRecord depuis la BDD**
+     - **Affichage date, heure, type (appel/SMS), contexte (normal/anniversaire)**
+     - **Icônes différentes pour appel vs SMS**
+   - Bouton "Modifier" pour éditer fréquence/catégorie/anniversaire
    - Dialog de confirmation pour suppression
 
 2. Tester la compilation
