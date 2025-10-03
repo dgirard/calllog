@@ -1,55 +1,173 @@
-# CallLog - Application de Suivi d'Appels
+# CallLog - Gestionnaire de Contacts
 
-Application Android Flutter permettant de gérer et suivre les appels et SMS réguliers à des contacts (famille, amis, professionnels) selon des fréquences définies, avec gestion des anniversaires.
+Application Android Flutter pour gérer et suivre les contacts réguliers avec vos proches.
 
-## Fonctionnalités
+## 📱 Fonctionnalités
 
-- 📞 Suivi des appels réguliers avec fréquences configurables (hebdomadaire, mensuelle, etc.)
-- 📱 Envoi de SMS avec messages pré-remplis
-- 🎂 Gestion des anniversaires avec rappels et messages personnalisés
-- 🔔 Système de priorités intelligent
-- 🎯 Filtres avancés (catégorie, fréquence, anniversaires)
-- 📊 Historique complet des contacts (appels et SMS)
+### Gestion des Contacts
+- **Ajout de contacts** depuis le répertoire Android
+- **Fréquences personnalisables** : hebdomadaire, bihebdomadaire, mensuel, trimestriel, annuel
+- **Catégories** : famille, amis, professionnel
+- **Priorités automatiques** basées sur la date du dernier contact
 
-## Technologies utilisées
+### Anniversaires
+- **Détection automatique** des anniversaires depuis les contacts Android
+- **Notifications visuelles** pour les anniversaires dans les 7 jours
+- **Badge prioritaire** pour les anniversaires du jour
+- **SMS d'anniversaire** avec template pré-rempli
 
-- **Framework** : Flutter 3.35.5
-- **Langage** : Dart 3.9.2
-- **Base de données** : SQLite
-- **Gestion d'état** : Provider
-- **Permissions** : permission_handler
-- **Contacts** : flutter_contacts
-- **Communication** : url_launcher
+### Communication
+- **Appels directs** depuis l'application
+- **Envoi de SMS** avec template personnalisable
+- **Historique complet** des interactions (appels et SMS)
+- **Enregistrement automatique** de chaque contact
 
-## Installation
+### Filtres et Tri
+- Filtrage par **catégorie**, **fréquence**, **priorité**
+- Filtre spécial **anniversaires**
+- Tri automatique par priorité et urgence
+- Recherche de contacts
 
-1. Cloner le projet
-2. Installer les dépendances : `flutter pub get`
-3. Lancer l'application : `flutter run`
-
-## Prérequis
-
-- Flutter SDK >= 3.0.0
-- Android SDK >= 21 (Android 5.0)
-
-## Architecture
+## 🏗️ Architecture
 
 ```
 lib/
-├── models/          # Modèles de données
-├── services/        # Services (BDD, permissions, contacts)
-├── providers/       # Gestion d'état
-├── screens/         # Écrans de l'application
-├── widgets/         # Widgets réutilisables
-└── utils/           # Utilitaires et helpers
+├── models/           # Modèles de données
+│   ├── enums.dart
+│   ├── tracked_contact.dart
+│   └── contact_record.dart
+├── providers/        # State management (Provider)
+│   ├── contacts_provider.dart
+│   └── filters_provider.dart
+├── screens/          # Écrans de l'application
+│   ├── home_screen.dart
+│   ├── add_contact_screen.dart
+│   ├── contact_detail_screen.dart
+│   └── filters_screen.dart
+├── services/         # Services métier
+│   ├── database_service.dart
+│   ├── contacts_service.dart
+│   ├── communication_service.dart
+│   └── permission_service.dart
+├── widgets/          # Widgets réutilisables
+│   ├── contact_card.dart
+│   ├── filter_chips.dart
+│   ├── priority_indicator.dart
+│   ├── birthday_badge.dart
+│   └── empty_state.dart
+├── utils/            # Utilitaires
+│   ├── constants.dart
+│   ├── priority_calculator.dart
+│   ├── birthday_utils.dart
+│   ├── date_utils.dart
+│   └── app_theme.dart
+└── main.dart
 ```
 
-## Permissions Android
+## 🚀 Installation
+
+### Prérequis
+- Flutter 3.35.5 ou supérieur
+- Dart 3.9.2 ou supérieur
+- Android SDK 36
+- Java 21
+
+### Dépendances
+```yaml
+dependencies:
+  flutter_localizations: sdk
+  sqflite: ^2.3.0           # Base de données locale
+  provider: ^6.1.1          # State management
+  permission_handler: ^11.2.0
+  flutter_contacts: ^1.1.7  # Accès aux contacts
+  url_launcher: ^6.2.4      # Appels et SMS
+  intl: ^0.20.2            # Formatage des dates
+```
+
+### Build
+
+**Debug:**
+```bash
+flutter pub get
+flutter build apk --debug
+```
+
+**Production:**
+```bash
+flutter build apk --release
+```
+
+L'APK de production se trouve dans `build/app/outputs/flutter-apk/app-release.apk`
+
+## 📦 Base de Données
+
+SQLite avec 2 tables principales :
+
+### tracked_contacts
+- Contacts suivis avec fréquence et catégorie
+- Date du dernier contact
+- Date d'anniversaire (optionnelle)
+
+### contact_history
+- Historique de chaque interaction
+- Type (appel/SMS)
+- Contexte (normal/anniversaire)
+
+## 🎨 Design
+
+- **Material Design 3**
+- Thème centralisé avec couleurs cohérentes
+- Animations fluides sur les interactions
+- Interface en français
+- Support des modes clair (sombre prévu pour évolution)
+
+## 🔐 Permissions
 
 L'application nécessite les permissions suivantes :
-- `READ_CONTACTS` : Accès au répertoire de contacts
-- `CALL_PHONE` : Lancement d'appels téléphoniques
-- `SEND_SMS` : Envoi de SMS
+- `READ_CONTACTS` : Accès aux contacts Android
+- `CALL_PHONE` : Passer des appels
+- `SEND_SMS` : Envoyer des SMS
+
+## 📝 Utilisation
+
+1. **Ajouter un contact** via le bouton "+"
+2. Sélectionner un contact depuis votre répertoire
+3. Choisir la fréquence et la catégorie
+4. L'anniversaire est importé automatiquement si disponible
+5. Appelez ou envoyez des SMS directement depuis la liste
+6. Consultez l'historique dans les détails du contact
+
+## 🎯 Système de Priorité
+
+1. **🎂 Anniversaire** (priorité maximale) - Anniversaire aujourd'hui
+2. **🔴 Haute** - Contact en retard selon la fréquence
+3. **🟠 Moyenne** - À contacter bientôt
+4. **🟢 Basse** - Contact à jour
+
+## 📊 Développement
+
+### Structure des Chantiers
+
+Le développement a été organisé en 18 chantiers (phases) :
+1. **Chantiers 1-10** : Infrastructure (models, services, providers, utils, widgets)
+2. **Chantier 11** : Écran d'accueil
+3. **Chantier 12** : Écran d'ajout de contact
+4. **Chantier 13** : Écran de détails d'un contact
+5. **Chantier 14** : Écran de filtres
+6. **Chantier 15** : Configuration du main.dart
+7. **Chantier 16** : Tests et corrections de bugs
+8. **Chantier 17** : Améliorations UI/UX
+9. **Chantier 18** : Build de production
+
+Voir [CHANTIERS.md](CHANTIERS.md) pour le détail de chaque phase.
+
+## 📄 Spécifications
+
+Voir [SPEC.md](SPEC.md) pour les spécifications complètes de l'application.
+
+## 📄 License
+
+Ce projet a été créé dans le cadre d'un projet personnel.
 
 ---
 
