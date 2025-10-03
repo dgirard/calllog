@@ -15,6 +15,25 @@ class FilterChips extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
+              // Bouton Tous (pour désactiver tous les filtres)
+              if (filtersProvider.hasActiveFilters)
+                FilterChip(
+                  label: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.clear_all, size: 16),
+                      SizedBox(width: 4),
+                      Text('Tous'),
+                    ],
+                  ),
+                  selected: false,
+                  onSelected: (_) => filtersProvider.resetFilters(),
+                  backgroundColor: Colors.grey.shade200,
+                ),
+
+              if (filtersProvider.hasActiveFilters)
+                const SizedBox(width: 8),
+
               // Chip Anniversaires
               FilterChip(
                 label: const Row(
@@ -29,16 +48,6 @@ class FilterChips extends StatelessWidget {
                 onSelected: (_) => filtersProvider.toggleBirthdaysFilter(),
                 selectedColor: Colors.pink.shade100,
               ),
-
-              const SizedBox(width: 8),
-
-              // Bouton Réinitialiser (si au moins un filtre actif)
-              if (filtersProvider.hasActiveFilters)
-                ActionChip(
-                  label: const Text('Réinitialiser'),
-                  avatar: const Icon(Icons.clear, size: 16),
-                  onPressed: () => filtersProvider.resetFilters(),
-                ),
 
               const SizedBox(width: 8),
 
