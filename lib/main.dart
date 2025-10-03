@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/add_contact_screen.dart';
 import 'screens/contact_detail_screen.dart';
 import 'screens/filters_screen.dart';
+import 'utils/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,22 +28,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'CallLog',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            elevation: 2,
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-          ),
-        ),
+        theme: AppTheme.lightTheme,
         // Localisation française
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,

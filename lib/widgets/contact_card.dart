@@ -7,7 +7,7 @@ import 'priority_indicator.dart';
 import 'birthday_badge.dart';
 
 /// Widget Card pour afficher un contact suivi
-class ContactCard extends StatelessWidget {
+class ContactCard extends StatefulWidget {
   final TrackedContact contact;
   final VoidCallback? onTap;
   final VoidCallback? onCallTap;
@@ -24,15 +24,47 @@ class ContactCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final priority = calculatePriority(contact);
+  State<ContactCard> createState() => _ContactCardState();
+}
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
+class _ContactCardState extends State<ContactCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final priority = calculatePriority(widget.contact);
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: InkWell(
+          onTap: widget.onTap,
+          onTapDown: (_) => _controller.forward(),
+          onTapUp: (_) => _controller.reverse(),
+          onTapCancel: () => _controller.reverse(),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -50,7 +82,7 @@ class ContactCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            contact.contactName,
+                            widget.contact.contactName,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -58,14 +90,14 @@ class ContactCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        BirthdayBadge(birthday: contact.birthday),
+                        BirthdayBadge(birthday: widget.contact.birthday),
                       ],
                     ),
                     const SizedBox(height: 4),
 
                     // Catégorie et fréquence
                     Text(
-                      '${contact.category.displayName} • ${contact.frequency.displayName}',
+                      '${widget.contact.category.displayName} • ${widget.contact.frequency.displayName}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -74,7 +106,7 @@ class ContactCard extends StatelessWidget {
 
                     // Dernier contact
                     Text(
-                      'Dernier contact: ${app_date_utils.getRelativeDateText(contact.lastContactDate)}',
+                      'Dernier contact: ${app_date_utils.getRelativeDateText(widget.contact.lastContactDate)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -92,7 +124,7 @@ class ContactCard extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.phone, size: 20),
                     color: Colors.green,
-                    onPressed: onCallTap,
+                    onPressed: widget.onCallTap,
                     tooltip: 'Appeler',
                   ),
 
@@ -100,7 +132,7 @@ class ContactCard extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.message, size: 20),
                     color: Colors.blue,
-                    onPressed: onSmsTap,
+                    onPressed: widget.onSmsTap,
                     tooltip: 'SMS',
                   ),
                 ],
@@ -108,6 +140,7 @@ class ContactCard extends StatelessWidget {
             ],
           ),
         ),
+          ),
       ),
     );
   }
