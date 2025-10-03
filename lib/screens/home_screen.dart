@@ -118,62 +118,60 @@ class _HomeScreenState extends State<HomeScreen> {
           final sortedContacts = contactsProvider.getSortedContacts();
           final filteredContacts = filtersProvider.applyFilters(sortedContacts);
 
-          if (filteredContacts.isEmpty) {
-            return EmptyState(
-              icon: contactsProvider.contacts.isEmpty
-                  ? Icons.contacts_outlined
-                  : Icons.filter_alt_off_outlined,
-              title: contactsProvider.contacts.isEmpty
-                  ? 'Aucun contact suivi'
-                  : 'Aucun contact correspondant',
-              message: contactsProvider.contacts.isEmpty
-                  ? 'Ajoutez votre premier contact pour commencer !'
-                  : 'Modifiez vos filtres pour voir plus de contacts',
-              actionLabel: contactsProvider.contacts.isEmpty
-                  ? 'Ajouter un contact'
-                  : null,
-              onActionPressed: contactsProvider.contacts.isEmpty
-                  ? () => Navigator.pushNamed(context, '/add-contact')
-                  : null,
-            );
-          }
+          return Column(
+            children: [
+              // Chips de filtrage - TOUJOURS VISIBLES
+              const FilterChips(),
 
-          return RefreshIndicator(
-            onRefresh: _refreshContacts,
-            child: Column(
-              children: [
-                // Chips de filtrage
-                const FilterChips(),
-
-                // Liste des contacts
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: filteredContacts.length,
-                    itemBuilder: (context, index) {
-                      final contact = filteredContacts[index];
-                      return ContactCard(
-                        contact: contact,
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/contact-detail',
-                            arguments: contact.id,
-                          );
-                        },
-                        onCallTap: () => _handleCallTap(
-                          contact.id!,
-                          contact.contactPhone,
+              // Contenu principal
+              Expanded(
+                child: filteredContacts.isEmpty
+                    ? EmptyState(
+                        icon: contactsProvider.contacts.isEmpty
+                            ? Icons.contacts_outlined
+                            : Icons.filter_alt_off_outlined,
+                        title: contactsProvider.contacts.isEmpty
+                            ? 'Aucun contact suivi'
+                            : 'Aucun contact correspondant',
+                        message: contactsProvider.contacts.isEmpty
+                            ? 'Ajoutez votre premier contact pour commencer !'
+                            : 'Modifiez vos filtres pour voir plus de contacts',
+                        actionLabel: contactsProvider.contacts.isEmpty
+                            ? 'Ajouter un contact'
+                            : null,
+                        onActionPressed: contactsProvider.contacts.isEmpty
+                            ? () => Navigator.pushNamed(context, '/add-contact')
+                            : null,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refreshContacts,
+                        child: ListView.builder(
+                          itemCount: filteredContacts.length,
+                          itemBuilder: (context, index) {
+                            final contact = filteredContacts[index];
+                            return ContactCard(
+                              contact: contact,
+                              onTap: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  '/contact-detail',
+                                  arguments: contact.id,
+                                );
+                              },
+                              onCallTap: () => _handleCallTap(
+                                contact.id!,
+                                contact.contactPhone,
+                              ),
+                              onSmsTap: () => _handleSmsTap(
+                                contact.id!,
+                                contact.contactPhone,
+                              ),
+                            );
+                          },
                         ),
-                        onSmsTap: () => _handleSmsTap(
-                          contact.id!,
-                          contact.contactPhone,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+                      ),
+              ),
+            ],
           );
         },
       ),
