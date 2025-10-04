@@ -179,49 +179,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _debugGeorges() async {
-    final contacts = await _databaseService.getContacts();
-    final georges = contacts.where((c) => c.contactName.contains('Georges')).firstOrNull;
-
-    if (georges == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Georges non trouvé')),
-        );
-      }
-      return;
-    }
-
-    final history = await _databaseService.getContactHistory(georges.id!);
-
-    String debug = 'Georges (${georges.contactPhone}):\n';
-    debug += 'Total: ${history.length} entrées\n\n';
-
-    for (var i = 0; i < history.length && i < 10; i++) {
-      final record = history[i];
-      debug += '${i + 1}. ${record.contactDate.toString()}\n';
-      debug += '   Méthode: ${record.contactMethod.name}\n';
-    }
-
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Debug Georges'),
-          content: SingleChildScrollView(
-            child: Text(debug, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
   Future<void> _clearAllHistory() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -355,15 +312,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Nettoyer les doublons'),
                   subtitle: const Text('Supprimer les entrées en double dans l\'historique'),
                   onTap: _cleanupDuplicates,
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-
-                // Debug Georges
-                ListTile(
-                  leading: const Icon(Icons.bug_report, color: Colors.purple),
-                  title: const Text('Debug Georges'),
-                  subtitle: const Text('Afficher l\'historique de Georges'),
-                  onTap: _debugGeorges,
                   trailing: const Icon(Icons.chevron_right),
                 ),
 

@@ -93,13 +93,6 @@ class CallLogService {
             return diff.inMinutes < 1; // Tolérance de 1 minute
           });
 
-          // DEBUG: Afficher les détails de l'appel
-          final contact = await _databaseService.getContactById(contactId);
-          if (contact != null && contact.contactName.contains('Georges')) {
-            print('DEBUG Georges: Date=${callDateTime.toIso8601String()}, Timestamp=${callDate}, Durée=${duration}s, Type=$callType');
-            print('DEBUG Georges: Already exists: $alreadyExists, Existing count: ${existing.length}');
-          }
-
           if (!alreadyExists) {
             // Enregistrer le contact avec la vraie date de l'appel
             await _databaseService.recordContact(
