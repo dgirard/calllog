@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/backup_service.dart';
 import '../services/call_log_service.dart';
+import '../services/database_service.dart';
 
 /// Écran des paramètres
 class SettingsScreen extends StatefulWidget {
@@ -13,10 +14,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final BackupService _backupService = BackupService();
   final CallLogService _callLogService = CallLogService();
+  final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = false;
   Map<String, int>? _stats;
   DateTime? _lastSyncTime;
-  int _syncDays = 7;
+  int _syncDays = 30;
 
   @override
   void initState() {
@@ -148,6 +150,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _cleanupDuplicates() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final deleted = await _databaseService.cleanupDuplicates();
+      await _loadStats();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$deleted doublon(s) supprimé(s)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du nettoyage: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _debugGeorges() async {
+    final contacts = await _databaseService.getContacts();
+    final georges = contacts.where((c) => c.contactName.contains('Georges')).firstOrNull;
+
+    if (georges == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Georges non trouvé')),
+        );
+      }
+      return;
+    }
+
+    final history = await _databaseService.getContactHistory(georges.id!);
+
+    String debug = 'Georges (${georges.contactPhone}):\n';
+    debug += 'Total: ${history.length} entrées\n\n';
+
+    for (var i = 0; i < history.length && i < 10; i++) {
+      final record = history[i];
+      debug += '${i + 1}. ${record.contactDate.toString()}\n';
+      debug += '   Méthode: ${record.contactMethod.name}\n';
+    }
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Debug Georges'),
+          content: SingleChildScrollView(
+            child: Text(debug, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearAllHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Effacer tout l\'historique ?'),
+        content: const Text(
+          'Cela va supprimer TOUT l\'historique de contacts pour TOUS les contacts suivis.\n\n'
+          'Vous pourrez ensuite resynchroniser les appels avec les bonnes dates.\n\n'
+          'Cette action est irréversible. Continuer ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Effacer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final contacts = await _databaseService.getContacts();
+      int totalDeleted = 0;
+
+      for (var contact in contacts) {
+        if (contact.id != null) {
+          final deleted = await _databaseService.deleteContactHistory(contact.id!);
+          totalDeleted += deleted;
+        }
+      }
+
+      await _loadStats();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$totalDeleted entrée(s) supprimée(s)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,6 +347,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                   ),
+                ),
+
+                // Nettoyer les doublons
+                ListTile(
+                  leading: const Icon(Icons.cleaning_services, color: Colors.orange),
+                  title: const Text('Nettoyer les doublons'),
+                  subtitle: const Text('Supprimer les entrées en double dans l\'historique'),
+                  onTap: _cleanupDuplicates,
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+
+                // Debug Georges
+                ListTile(
+                  leading: const Icon(Icons.bug_report, color: Colors.purple),
+                  title: const Text('Debug Georges'),
+                  subtitle: const Text('Afficher l\'historique de Georges'),
+                  onTap: _debugGeorges,
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+
+                // Effacer tout l'historique
+                ListTile(
+                  leading: const Icon(Icons.delete_forever, color: Colors.red),
+                  title: const Text('Effacer tout l\'historique'),
+                  subtitle: const Text('Supprimer toutes les entrées pour resynchroniser'),
+                  onTap: _clearAllHistory,
+                  trailing: const Icon(Icons.chevron_right),
                 ),
 
                 const Divider(),

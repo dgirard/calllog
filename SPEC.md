@@ -294,5 +294,42 @@ Tri de la liste :
 
 ---
 
-**Version** : 1.1
-**Date** : 2025-10-03
+## 11. Nouveautés version 1.2 - Synchronisation automatique du journal d'appels
+
+### Fonctionnalités ajoutées :
+- ✅ **Synchronisation automatique au démarrage** : Les appels sont automatiquement synchronisés depuis le journal d'appels Android à chaque lancement de l'app (30 derniers jours)
+- ✅ **Filtrage intelligent des appels** :
+  - Uniquement les appels sortants (type 2)
+  - Durée minimale de 10 secondes (ignore les appels ratés/tests)
+  - Utilisation des vraies dates d'appels (correction du bug de timestamps)
+- ✅ **Anti-doublons amélioré** : Tolérance de 1 minute pour éviter les entrées multiples
+- ✅ **Mise à jour correcte de lastContactDate** : Garde toujours la date la plus récente
+- ✅ **Bouton "Reset dernier contact"** : Permet de remettre un contact en état "Jamais contacté"
+- ✅ **Bouton "Marquer comme contacté"** : Enregistrement manuel avec méthode "autre" (pour rencontres physiques)
+- ✅ **Filtre très strict** : Seuil de priorité porté à 95% (au lieu de 80%)
+- ✅ **Normalisation des numéros** : Gestion des formats 06... et +336... pour matching correct
+- ✅ **Permission READ_CALL_LOG** : Accès au journal d'appels Android
+
+### Outils de maintenance :
+- ✅ **Nettoyer les doublons** : Bouton dans Paramètres pour supprimer les entrées en double
+- ✅ **Effacer tout l'historique** : Reset complet pour resynchronisation propre
+- ✅ **Debug Georges** : Outil de diagnostic pour vérifier l'historique d'un contact
+- ✅ **Synchronisation manuelle** : Bouton dans Paramètres (en plus de l'auto-sync au démarrage)
+- ✅ **Configuration période de sync** : Choix entre 7, 14 ou 30 jours
+
+### Corrections de bugs :
+- 🐛 **Dates incorrectes** : Les appels synchronisés utilisaient `DateTime.now()` au lieu de la vraie date de l'appel
+- 🐛 **Faux appels** : Les appels de 0-5 secondes (ratés) étaient comptabilisés
+- 🐛 **lastContactDate incorrect** : La date affichée ne correspondait pas au dernier appel réel
+- 🐛 **Doublons** : Multiples entrées pour le même appel lors de syncs successives
+
+### Améliorations techniques :
+- `database_service.recordContact()` accepte maintenant un paramètre `contactDate` optionnel
+- `call_log_service.dart` utilise les timestamps Android (millisecondes) pour dates exactes
+- Logique de mise à jour de `lastContactDate` : ne met à jour que si date plus récente
+- Synchronisation en arrière-plan au lancement sans bloquer l'UI
+
+---
+
+**Version** : 1.2
+**Date** : 2025-10-04

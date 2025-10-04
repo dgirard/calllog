@@ -249,13 +249,14 @@ class DatabaseService {
     required int trackedContactId,
     required ContactMethod contactMethod,
     required ContactContext context,
+    DateTime? contactDate,
   }) async {
     try {
-      final now = DateTime.now();
+      final date = contactDate ?? DateTime.now();
 
       final record = ContactRecord(
         trackedContactId: trackedContactId,
-        contactDate: now,
+        contactDate: date,
         contactMethod: contactMethod,
         contactType: contactMethod.toJson(), // compatibility
         context: context,
@@ -263,11 +264,14 @@ class DatabaseService {
 
       await insertContactRecord(record);
 
-      // Mettre à jour la date de dernier contact
+      // Mettre à jour la date de dernier contact si c'est plus récent
       final contact = await getContactById(trackedContactId);
       if (contact != null) {
-        final updatedContact = contact.copyWith(lastContactDate: now);
-        await updateContact(updatedContact);
+        // Ne mettre à jour que si la nouvelle date est plus récente
+        if (contact.lastContactDate == null || date.isAfter(contact.lastContactDate!)) {
+          final updatedContact = contact.copyWith(lastContactDate: date);
+          await updateContact(updatedContact);
+        }
       }
     } catch (e) {
       throw Exception('Erreur lors de l\'enregistrement du contact: $e');
@@ -275,6 +279,47 @@ class DatabaseService {
   }
 
   // ==================== Utilitaires ====================
+
+  /// Supprime les doublons dans l'historique des contacts
+  /// Garde uniquement le premier enregistrement pour chaque date/heure
+  Future<int> cleanupDuplicates() async {
+    try {
+      final db = await database;
+      int deletedCount = 0;
+
+      // Récupérer tous les contacts
+      final contacts = await getContacts();
+
+      for (var contact in contacts) {
+        if (contact.id == null) continue;
+
+        // Récupérer l'historique du contact
+        final history = await getContactHistory(contact.id!);
+
+        // Grouper par date (avec tolérance de 1 minute)
+        final toDelete = <int>[];
+        for (int i = 0; i < history.length; i++) {
+          for (int j = i + 1; j < history.length; j++) {
+            final diff = history[i].contactDate.difference(history[j].contactDate).abs();
+            if (diff.inMinutes < 1 && history[j].id != null) {
+              // Marquer le deuxième comme doublon
+              toDelete.add(history[j].id!);
+            }
+          }
+        }
+
+        // Supprimer les doublons
+        for (var recordId in toDelete) {
+          await deleteContactRecord(recordId);
+          deletedCount++;
+        }
+      }
+
+      return deletedCount;
+    } catch (e) {
+      throw Exception('Erreur lors du nettoyage des doublons: $e');
+    }
+  }
 
   /// Ferme la connexion à la base de données
   Future<void> close() async {

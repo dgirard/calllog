@@ -28,7 +28,7 @@ class CallLogService {
       });
 
       if (result is List) {
-        return result.cast<Map<String, dynamic>>();
+        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       return [];
     } catch (e) {
@@ -67,13 +67,17 @@ class CallLogService {
         final phoneNumber = call['number'] as String?;
         final callDate = call['date'] as int?;
         final callType = call['type'] as int?;
+        final duration = call['duration'] as int?;
 
-        if (phoneNumber == null || callDate == null || callType == null) {
+        if (phoneNumber == null || callDate == null || callType == null || duration == null) {
           continue;
         }
 
         // Filtrer uniquement les appels sortants (type 2)
         if (callType != 2) continue;
+
+        // Filtrer uniquement les appels de plus de 10 secondes
+        if (duration < 10) continue;
 
         final normalizedPhone = _normalizePhoneNumber(phoneNumber);
         final contactId = phoneToContactMap[normalizedPhone];
@@ -89,20 +93,21 @@ class CallLogService {
             return diff.inMinutes < 1; // Tolérance de 1 minute
           });
 
+          // DEBUG: Afficher les détails de l'appel
+          final contact = await _databaseService.getContactById(contactId);
+          if (contact != null && contact.contactName.contains('Georges')) {
+            print('DEBUG Georges: Date=${callDateTime.toIso8601String()}, Timestamp=${callDate}, Durée=${duration}s, Type=$callType');
+            print('DEBUG Georges: Already exists: $alreadyExists, Existing count: ${existing.length}');
+          }
+
           if (!alreadyExists) {
-            // Enregistrer le contact
+            // Enregistrer le contact avec la vraie date de l'appel
             await _databaseService.recordContact(
               trackedContactId: contactId,
               contactMethod: ContactMethod.call,
               context: ContactContext.normal,
+              contactDate: callDateTime,
             );
-
-            // Mettre à jour la date de dernier contact
-            final contact = await _databaseService.getContactById(contactId);
-            if (contact != null) {
-              final updated = contact.copyWith(lastContactDate: callDateTime);
-              await _databaseService.updateContact(updated);
-            }
 
             syncedCount++;
           }

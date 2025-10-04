@@ -24,8 +24,9 @@ enum Priority {
 
 /// Méthode de contact utilisée
 enum ContactMethod {
-  call, // Appel téléphonique
-  sms,  // SMS
+  call,  // Appel téléphonique
+  sms,   // SMS
+  other, // Autre (rencontre en personne, etc.)
 }
 
 /// Contexte du contact
@@ -132,6 +133,8 @@ extension ContactMethodExtension on ContactMethod {
         return 'Appel';
       case ContactMethod.sms:
         return 'SMS';
+      case ContactMethod.other:
+        return 'Autre';
     }
   }
 }

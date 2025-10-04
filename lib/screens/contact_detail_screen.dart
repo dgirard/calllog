@@ -106,6 +106,73 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     }
   }
 
+  Future<void> _handleSkip() async {
+    if (_contact == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Marquer comme contacté ?'),
+        content: const Text(
+          'Cela va mettre à jour la date de dernier contact sans appeler.\n\nUtile si vous vous êtes vu en personne.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Enregistrer un contact "autre"
+        await _databaseService.recordContact(
+          trackedContactId: _contact!.id!,
+          contactMethod: ContactMethod.other,
+          context: ContactContext.normal,
+        );
+
+        // Mettre à jour la date de dernier contact
+        final updated = TrackedContact(
+          id: _contact!.id,
+          contactId: _contact!.contactId,
+          contactName: _contact!.contactName,
+          contactPhone: _contact!.contactPhone,
+          frequency: _contact!.frequency,
+          category: _contact!.category,
+          lastContactDate: DateTime.now(),
+          birthday: _contact!.birthday,
+          createdAt: _contact!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+        await _databaseService.updateTrackedContact(updated);
+
+        await _loadContactDetails();
+        if (mounted) {
+          context.read<ContactsProvider>().loadContacts();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Contact marqué comme effectué'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _handleBirthdaySmsTap() async {
     if (_contact == null) return;
 
@@ -156,6 +223,65 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Contact mis à jour'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _resetLastContact() async {
+    if (_contact == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Réinitialiser le dernier contact ?'),
+        content: const Text(
+          'Cela va effacer la date du dernier contact. Le contact apparaîtra comme "Jamais contacté".',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Réinitialiser'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Créer un nouveau contact avec lastContactDate à null
+        final updated = TrackedContact(
+          id: _contact!.id,
+          contactId: _contact!.contactId,
+          contactName: _contact!.contactName,
+          contactPhone: _contact!.contactPhone,
+          frequency: _contact!.frequency,
+          category: _contact!.category,
+          lastContactDate: null, // Réinitialiser à null
+          birthday: _contact!.birthday,
+          createdAt: _contact!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+        await _databaseService.updateTrackedContact(updated);
+        await _loadContactDetails();
+        if (mounted) {
+          context.read<ContactsProvider>().loadContacts();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dernier contact réinitialisé'),
               backgroundColor: Colors.green,
             ),
           );
@@ -355,29 +481,45 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               // Boutons d'action
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _handleCallTap,
-                        icon: const Icon(Icons.phone),
-                        label: const Text('Appeler'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _handleCallTap,
+                            icon: const Icon(Icons.phone),
+                            label: const Text('Appeler'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _handleSmsTap,
+                            icon: const Icon(Icons.message),
+                            label: const Text('SMS'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _handleSmsTap,
-                        icon: const Icon(Icons.message),
-                        label: const Text('SMS'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _handleSkip,
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: const Text('Marquer comme contacté'),
+                        style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -405,7 +547,10 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               const SizedBox(height: 16),
 
               // Informations
-              _InfoSection(contact: _contact!),
+              _InfoSection(
+                contact: _contact!,
+                onResetLastContact: _resetLastContact,
+              ),
 
               const SizedBox(height: 16),
 
@@ -422,8 +567,12 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
 /// Section d'informations du contact
 class _InfoSection extends StatelessWidget {
   final TrackedContact contact;
+  final VoidCallback onResetLastContact;
 
-  const _InfoSection({required this.contact});
+  const _InfoSection({
+    required this.contact,
+    required this.onResetLastContact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -454,10 +603,22 @@ class _InfoSection extends StatelessWidget {
               value: contact.category.displayName,
             ),
             const Divider(),
-            _InfoRow(
-              icon: Icons.access_time,
-              label: 'Dernier contact',
-              value: app_date_utils.getRelativeDateText(contact.lastContactDate),
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoRow(
+                    icon: Icons.access_time,
+                    label: 'Dernier contact',
+                    value: app_date_utils.getRelativeDateText(contact.lastContactDate),
+                  ),
+                ),
+                if (contact.lastContactDate != null)
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    tooltip: 'Réinitialiser',
+                    onPressed: onResetLastContact,
+                  ),
+              ],
             ),
             if (contact.birthday != null) ...[
               const Divider(),

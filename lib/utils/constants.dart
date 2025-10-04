@@ -17,8 +17,8 @@ const Map<CallFrequency, int> frequencyDurations = {
 /// Seuil pour anniversaire proche (en jours)
 const int birthdayThresholdDays = 7;
 
-/// Seuil pour priorité moyenne (80% du délai attendu)
-const double mediumPriorityThreshold = 0.8;
+/// Seuil pour priorité moyenne (95% du délai attendu)
+const double mediumPriorityThreshold = 0.95;
 
 // ==================== Couleurs ====================
 

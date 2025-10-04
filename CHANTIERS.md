@@ -641,6 +641,208 @@ flutter logs
 
 ---
 
-**Version** : 1.0
-**Date** : 2025-10-03
-**Nombre de chantiers** : 18
+## CHANTIERS VERSION 1.2 - Synchronisation automatique du journal d'appels
+
+### CHANTIER 19 : Service de lecture du journal d'appels Android
+
+**Objectif** : Créer un service natif Android pour lire le journal d'appels via MethodChannel
+
+**Tâches** :
+1. ✅ Modifier `android/app/src/main/kotlin/.../MainActivity.kt` :
+   - Créer méthode `getCallsSince(timestamp: Long)`
+   - Query sur `CallLog.Calls.CONTENT_URI` avec projection (NUMBER, DATE, TYPE, DURATION)
+   - Retourner List<Map<String, Any>> vers Flutter
+2. ✅ Ajouter permission dans `AndroidManifest.xml` :
+   ```xml
+   <uses-permission android:name="android.permission.READ_CALL_LOG" />
+   ```
+3. ✅ Créer `lib/services/call_log_service.dart` :
+   - Méthode `getCallsSince(DateTime since)` utilisant MethodChannel
+   - Méthode `syncCallsWithTrackedContacts({DateTime? since})` :
+     - Récupérer appels depuis N jours (défaut 30)
+     - Filtrer uniquement appels sortants (type 2)
+     - Filtrer uniquement appels > 10 secondes
+     - Normaliser les numéros (06... → +336..., puis retirer +)
+     - Matcher avec contacts suivis
+     - Vérifier anti-doublons (tolérance 1 minute)
+     - Enregistrer avec vraie date d'appel
+   - Méthode `_normalizePhoneNumber(String phone)` pour matching
+   - Retourner nombre d'appels synchronisés
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 19: service lecture journal d'appels Android"
+```
+
+---
+
+### CHANTIER 20 : Synchronisation automatique au démarrage
+
+**Objectif** : Lancer la synchronisation automatiquement au démarrage de l'app
+
+**Tâches** :
+1. ✅ Modifier `lib/screens/home_screen.dart` :
+   - Dans `initState()`, appeler `_syncCallsInBackground()` après chargement contacts
+   - Méthode `_syncCallsInBackground()` :
+     - Appeler `CallLogService.syncCallsWithTrackedContacts()`
+     - Si appels synchronisés > 0 : recharger contacts et afficher SnackBar
+     - Si erreur : silencieuse (ne pas bloquer UI)
+2. ✅ Tester sur appareil réel avec historique d'appels
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 20: synchronisation auto au démarrage"
+```
+
+---
+
+### CHANTIER 21 : Corrections des bugs de dates et doublons
+
+**Objectif** : Corriger les bugs identifiés lors de la synchronisation
+
+**Tâches** :
+1. ✅ **Bug dates incorrectes** : Modifier `database_service.recordContact()` :
+   - Ajouter paramètre `DateTime? contactDate`
+   - Utiliser `contactDate ?? DateTime.now()`
+2. ✅ **Bug lastContactDate** : Modifier logique de mise à jour :
+   - Ne mettre à jour que si `date.isAfter(contact.lastContactDate!)`
+3. ✅ **Bug faux appels** : Ajouter filtre durée dans `call_log_service.dart` :
+   - `if (duration < 10) continue;`
+4. ✅ Modifier `call_log_service.dart` pour passer `callDateTime` à `recordContact()`
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 21: corrections bugs dates et filtrage appels"
+```
+
+---
+
+### CHANTIER 22 : Fonctionnalités de gestion manuelle
+
+**Objectif** : Ajouter boutons pour gestion manuelle des contacts
+
+**Tâches** :
+1. ✅ **Bouton Reset dernier contact** dans `contact_detail_screen.dart` :
+   - Icône refresh à côté de "Dernier contact"
+   - Dialog de confirmation
+   - Créer nouveau `TrackedContact` avec `lastContactDate: null` (copyWith ne supporte pas null)
+   - Afficher "Jamais contacté" si null
+2. ✅ **Bouton Marquer comme contacté** :
+   - Nouveau bouton "Marquer comme contacté"
+   - Enregistrer avec `ContactMethod.other`
+   - Mettre à jour `lastContactDate` à maintenant
+3. ✅ Ajouter `ContactMethod.other` dans enums avec displayName
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 22: boutons reset et marquer comme contacté"
+```
+
+---
+
+### CHANTIER 23 : Écran des paramètres avec outils de maintenance
+
+**Objectif** : Créer écran paramètres avec synchronisation et outils debug
+
+**Tâches** :
+1. ✅ Créer `lib/screens/settings_screen.dart` :
+   - Section "Synchronisation des appels" :
+     - Affichage dernière sync
+     - Bouton "Synchroniser maintenant"
+     - Dropdown période de sync (7/14/30 jours)
+   - Section "Maintenance" :
+     - Bouton "Nettoyer les doublons"
+     - Bouton "Effacer tout l'historique" (avec confirmation)
+     - Bouton "Debug Georges" (affiche historique dans dialog)
+   - Section "Sauvegarde" (existante) :
+     - Export/Import JSON
+     - Statistiques
+2. ✅ Ajouter méthode `cleanupDuplicates()` dans `database_service.dart` :
+   - Parcourir tous contacts
+   - Pour chaque contact, récupérer historique
+   - Détecter doublons (tolérance 1 minute)
+   - Supprimer les doublons
+   - Retourner nombre supprimé
+3. ✅ Ajouter méthode `_clearAllHistory()` pour reset complet
+4. ✅ Ajouter route '/settings' dans `main.dart`
+5. ✅ Ajouter bouton Paramètres dans AppBar de `home_screen.dart`
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 23: écran paramètres avec outils maintenance"
+```
+
+---
+
+### CHANTIER 24 : Ajustement du filtre de priorité
+
+**Objectif** : Rendre le filtre "À contacter" plus strict
+
+**Tâches** :
+1. ✅ Modifier `lib/utils/constants.dart` :
+   - Changer `mediumPriorityThreshold` de 0.8 à 0.95
+2. ✅ Impact : Contacts affichés en "vert" uniquement si contactés dans les 95% du délai attendu
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 24: filtre priorité strict (95%)"
+```
+
+---
+
+### CHANTIER 25 : Tests et validation v1.2
+
+**Objectif** : Tester toutes les nouvelles fonctionnalités
+
+**Tâches** :
+1. ✅ Tester synchronisation au démarrage
+2. ✅ Tester bouton synchronisation manuelle
+3. ✅ Vérifier filtrage appels (sortants, >10s)
+4. ✅ Vérifier dates correctes dans historique
+5. ✅ Tester reset dernier contact
+6. ✅ Tester marquer comme contacté
+7. ✅ Tester nettoyage doublons
+8. ✅ Tester effacer historique + resync
+9. ✅ Vérifier normalisation numéros (06 vs +336)
+10. ✅ Tester sur plusieurs contacts différents
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 25: tests et validation version 1.2"
+```
+
+---
+
+### CHANTIER 26 : Build et release v1.2
+
+**Objectif** : Générer l'APK de production v1.2
+
+**Tâches** :
+1. Mettre à jour `android/app/build.gradle` :
+   - versionCode: 3
+   - versionName: "1.2.0"
+2. Générer APK release : `flutter build apk --release`
+3. Tester APK sur appareil réel
+4. Mettre à jour SPEC.md avec nouveautés v1.2 ✅
+5. Mettre à jour CHANTIERS.md avec liste chantiers v1.2 ✅
+6. Mettre à jour README.md avec fonctionnalités v1.2
+
+**Commit** :
+```
+git add .
+git commit -m "v1.2 chantier 26: build et documentation version 1.2"
+git tag v1.2.0
+```
+
+---
+
+**Version** : 1.2
+**Date** : 2025-10-04
+**Nombre de chantiers** : 26 (18 base + 8 v1.2)

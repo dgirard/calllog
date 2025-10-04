@@ -40,9 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _syncCallsInBackground() async {
     try {
-      // Synchroniser depuis les 7 derniers jours
+      // Synchroniser depuis les 30 derniers jours
       final synced = await _callLogService.syncCallsWithTrackedContacts(
-        since: DateTime.now().subtract(const Duration(days: 7)),
+        since: DateTime.now().subtract(const Duration(days: 30)),
       );
 
       if (synced > 0 && mounted) {
