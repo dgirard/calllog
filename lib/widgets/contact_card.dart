@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/tracked_contact.dart';
 import '../models/enums.dart';
 import '../utils/priority_calculator.dart';
 import '../utils/date_utils.dart' as app_date_utils;
+import '../utils/anonymization_utils.dart';
+import '../providers/anonymity_provider.dart';
 import 'priority_indicator.dart';
 import 'birthday_badge.dart';
 
@@ -53,6 +56,13 @@ class _ContactCardState extends State<ContactCard>
   @override
   Widget build(BuildContext context) {
     final priority = calculatePriority(widget.contact);
+    final anonymityProvider = context.watch<AnonymityProvider>();
+    final isAnonymous = anonymityProvider.isAnonymousModeEnabled;
+
+    // Anonymiser si mode activé
+    final displayName = isAnonymous
+        ? anonymizeName(widget.contact.contactName)
+        : widget.contact.contactName;
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -82,7 +92,7 @@ class _ContactCardState extends State<ContactCard>
                       children: [
                         Expanded(
                           child: Text(
-                            widget.contact.contactName,
+                            displayName,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

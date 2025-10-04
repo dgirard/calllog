@@ -4,11 +4,13 @@ import '../models/tracked_contact.dart';
 import '../models/contact_record.dart';
 import '../models/enums.dart';
 import '../providers/contacts_provider.dart';
+import '../providers/anonymity_provider.dart';
 import '../services/communication_service.dart';
 import '../services/database_service.dart';
 import '../utils/priority_calculator.dart';
 import '../utils/date_utils.dart' as app_date_utils;
 import '../utils/birthday_utils.dart';
+import '../utils/anonymization_utils.dart';
 import '../widgets/priority_indicator.dart';
 
 /// Écran de détails d'un contact suivi
@@ -362,9 +364,20 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     final isBirthday = isBirthdayToday(_contact!.birthday);
     final birthdayCountdown = getBirthdayCountdownText(_contact!.birthday);
 
+    final anonymityProvider = context.watch<AnonymityProvider>();
+    final isAnonymous = anonymityProvider.isAnonymousModeEnabled;
+
+    // Anonymiser si mode activé
+    final displayName = isAnonymous
+        ? anonymizeName(_contact!.contactName)
+        : _contact!.contactName;
+    final displayPhone = isAnonymous
+        ? anonymizePhoneNumber(_contact!.contactPhone)
+        : _contact!.contactPhone;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_contact!.contactName),
+        title: Text(displayName),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -396,7 +409,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                       radius: 40,
                       backgroundColor: Theme.of(context).primaryColor,
                       child: Text(
-                        _contact!.contactName[0].toUpperCase(),
+                        displayName[0].toUpperCase(),
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -408,7 +421,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
 
                     // Nom
                     Text(
-                      _contact!.contactName,
+                      displayName,
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -419,7 +432,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                     // Numéro
                     const SizedBox(height: 4),
                     Text(
-                      _contact!.contactPhone,
+                      displayPhone,
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[600],

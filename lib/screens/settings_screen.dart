@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/backup_service.dart';
 import '../services/call_log_service.dart';
 import '../services/database_service.dart';
+import '../providers/anonymity_provider.dart';
 
 /// Écran des paramètres
 class SettingsScreen extends StatefulWidget {
@@ -460,6 +462,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 const SizedBox(height: 16),
+
+                // Mode anonyme
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Mode démonstration',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                Consumer<AnonymityProvider>(
+                  builder: (context, anonymityProvider, child) {
+                    return SwitchListTile(
+                      secondary: const Icon(Icons.privacy_tip, color: Colors.purple),
+                      title: const Text('Mode anonyme'),
+                      subtitle: const Text('Masquer noms et numéros pour démo/vidéo'),
+                      value: anonymityProvider.isAnonymousModeEnabled,
+                      onChanged: (bool value) {
+                        anonymityProvider.setAnonymousMode(value);
+                      },
+                    );
+                  },
+                ),
+
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.purple.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.purple.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'À quoi sert le mode anonyme ?',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Active ce mode pour faire des captures d\'écran ou vidéos de démo. '
+                          'Les noms de famille seront remplacés par des ******, et les 4 derniers chiffres '
+                          'des numéros de téléphone seront masqués.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
                 // À propos
                 const Divider(),

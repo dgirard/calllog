@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/contacts_provider.dart';
 import 'providers/filters_provider.dart';
+import 'providers/anonymity_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_contact_screen.dart';
 import 'screens/contact_detail_screen.dart';
@@ -25,6 +26,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ContactsProvider()),
         ChangeNotifierProvider(create: (_) => FiltersProvider()),
+        ChangeNotifierProvider(create: (_) => AnonymityProvider()),
       ],
       child: MaterialApp(
         title: 'CallLog',
