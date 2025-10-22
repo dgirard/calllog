@@ -1,17 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../models/tracked_contact.dart';
 import '../models/contact_record.dart';
+import '../models/contact_note.dart';
 import '../models/enums.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/anonymity_provider.dart';
 import '../services/communication_service.dart';
 import '../services/database_service.dart';
+import '../services/audio_recording_service.dart';
+import '../services/transcription_service.dart';
 import '../utils/priority_calculator.dart';
 import '../utils/date_utils.dart' as app_date_utils;
 import '../utils/birthday_utils.dart';
 import '../utils/anonymization_utils.dart';
 import '../widgets/priority_indicator.dart';
+import '../widgets/note_dialog.dart';
 
 /// Écran de détails d'un contact suivi
 class ContactDetailScreen extends StatefulWidget {
@@ -29,15 +35,31 @@ class ContactDetailScreen extends StatefulWidget {
 class _ContactDetailScreenState extends State<ContactDetailScreen> {
   final CommunicationService _communicationService = CommunicationService();
   final DatabaseService _databaseService = DatabaseService();
+  final AudioRecordingService _audioService = AudioRecordingService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  String? _playingAudioPath;
+  bool _isPlaying = false;
 
   TrackedContact? _contact;
   List<ContactRecord> _history = [];
+  List<ContactNote> _notes = [];
   bool _isLoading = true;
+  bool _isRecording = false;
+  Timer? _recordingTimer;
+  Duration _recordingDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _loadContactDetails();
+  }
+
+  @override
+  void dispose() {
+    _recordingTimer?.cancel();
+    _audioService.dispose();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   Future<void> _loadContactDetails() async {
@@ -46,11 +68,13 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     try {
       final contact = await _databaseService.getTrackedContactById(widget.contactId);
       final history = await _databaseService.getContactHistory(widget.contactId);
+      final notes = await _databaseService.getNotes(widget.contactId);
 
       if (mounted) {
         setState(() {
           _contact = contact;
           _history = history;
+          _notes = notes;
           _isLoading = false;
         });
       }
@@ -298,6 +322,164 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     }
   }
 
+  Future<void> _addNote() async {
+    if (_contact == null) return;
+
+    final result = await showDialog<NoteDialogResult>(
+      context: context,
+      builder: (context) => const NoteDialog(),
+    );
+
+    if (result != null) {
+      try {
+        final note = ContactNote(
+          trackedContactId: _contact!.id!,
+          content: result.content,
+          category: result.category,
+          importance: result.importance,
+          isPinned: result.isPinned,
+          isActionItem: result.isActionItem,
+          dueDate: result.dueDate,
+          createdAt: DateTime.now(),
+        );
+
+        await _databaseService.insertNote(note);
+        await _loadContactDetails();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Note ajoutée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _editNote(ContactNote note) async {
+    final result = await showDialog<NoteDialogResult>(
+      context: context,
+      builder: (context) => NoteDialog(note: note),
+    );
+
+    if (result != null) {
+      try {
+        final updatedNote = note.copyWith(
+          content: result.content,
+          category: result.category,
+          importance: result.importance,
+          isPinned: result.isPinned,
+          isActionItem: result.isActionItem,
+          dueDate: result.dueDate,
+          updatedAt: DateTime.now(),
+        );
+
+        await _databaseService.updateNote(updatedNote);
+        await _loadContactDetails();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Note modifiée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _viewNoteFullscreen(ContactNote note) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Text(note.category.icon, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(note.category.displayName)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Text(note.content),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _editNote(note);
+            },
+            child: const Text('Modifier'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteNote(ContactNote note) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer la note ?'),
+        content: const Text('Cette action est irréversible.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && note.id != null) {
+      try {
+        await _databaseService.deleteNote(note.id!);
+        await _loadContactDetails();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Note supprimée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteContact() async {
     if (_contact == null) return;
 
@@ -340,6 +522,193 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
             SnackBar(content: Text('Erreur: $e')),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (_contact == null) return;
+
+    final result = await _audioService.startRecording(contactId: _contact!.id!);
+
+    if (result.isSuccess) {
+      setState(() {
+        _isRecording = true;
+        _recordingDuration = Duration.zero;
+      });
+
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        final duration = _audioService.getCurrentDuration();
+        if (duration != null && mounted) {
+          setState(() {
+            _recordingDuration = duration;
+          });
+        }
+      });
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error!.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    if (_contact == null) return;
+
+    _recordingTimer?.cancel();
+
+    final result = await _audioService.stopRecording();
+
+    if (result.isSuccess) {
+      setState(() {
+        _isRecording = false;
+        _recordingDuration = Duration.zero;
+      });
+
+      final metadata = result.data!;
+
+      // Afficher un message de traitement
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enregistrement sauvegardé, transcription en cours...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Lancer la transcription en arrière-plan
+      String noteContent = 'Enregistrement audio (${_formatDuration(metadata.duration)})';
+
+      // Vérifier si la transcription est configurée
+      final isConfigured = await TranscriptionService.isConfigured();
+      if (isConfigured) {
+        // Transcrire l'audio
+        final transcription = await TranscriptionService.transcribeAudio(metadata.path);
+
+        if (transcription != null && transcription.isNotEmpty) {
+          noteContent = transcription;
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✓ Transcription réussie !'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          noteContent = 'Enregistrement audio (${_formatDuration(metadata.duration)})\n\n⚠️ Transcription impossible\n\nFichier: ${metadata.path}';
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Transcription échouée - Audio sauvegardé'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } else {
+        noteContent = 'Enregistrement audio (${_formatDuration(metadata.duration)})\n\nℹ️ Transcription non configurée\n\nConfigurez une clé API Gemini dans les paramètres pour activer la transcription automatique.\n\nFichier: ${metadata.path}';
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Audio sauvegardé - Configurez Gemini pour la transcription'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
+      // Créer une note de type transcript avec le contenu (transcrit ou non)
+      final note = ContactNote(
+        trackedContactId: _contact!.id!,
+        content: noteContent,
+        audioPath: metadata.path,
+        category: NoteCategory.transcript,
+        importance: NoteImportance.medium,
+        isPinned: false,
+        isActionItem: false,
+        createdAt: metadata.createdAt,
+      );
+
+      await context.read<ContactsProvider>().addNote(_contact!.id!, note);
+      await _loadContactDetails();
+    } else {
+      setState(() {
+        _isRecording = false;
+        _recordingDuration = Duration.zero;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error!.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
+  Future<void> _toggleAudioPlayback(String audioPath) async {
+    try {
+      if (_playingAudioPath == audioPath && _isPlaying) {
+        // Pause si on joue déjà ce fichier
+        await _audioPlayer.pause();
+        setState(() {
+          _isPlaying = false;
+        });
+      } else if (_playingAudioPath == audioPath && !_isPlaying) {
+        // Resume si c'est le même fichier en pause
+        await _audioPlayer.resume();
+        setState(() {
+          _isPlaying = true;
+        });
+      } else {
+        // Nouveau fichier
+        await _audioPlayer.stop();
+        await _audioPlayer.play(DeviceFileSource(audioPath));
+        setState(() {
+          _playingAudioPath = audioPath;
+          _isPlaying = true;
+        });
+
+        // Écouter la fin de lecture
+        _audioPlayer.onPlayerComplete.listen((_) {
+          if (mounted) {
+            setState(() {
+              _isPlaying = false;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de lecture: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -526,6 +895,25 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    // Bouton d'enregistrement audio
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isRecording ? _stopRecording : _startRecording,
+                        icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+                        label: Text(
+                          _isRecording
+                            ? 'Arrêter l\'enregistrement (${_formatDuration(_recordingDuration)})'
+                            : 'Enregistrer un mémo audio',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: _isRecording ? Colors.red : Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -563,6 +951,17 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               _InfoSection(
                 contact: _contact!,
                 onResetLastContact: _resetLastContact,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Notes
+              _NotesSection(
+                notes: _notes,
+                onAddNote: _addNote,
+                onEditNote: _editNote,
+                onDeleteNote: _deleteNote,
+                onViewNote: _viewNoteFullscreen,
               ),
 
               const SizedBox(height: 16),
@@ -908,6 +1307,198 @@ class _EditContactDialogState extends State<_EditContactDialog> {
           child: const Text('Enregistrer'),
         ),
       ],
+    );
+  }
+}
+
+/// Section des notes
+class _NotesSection extends StatelessWidget {
+  final List<ContactNote> notes;
+  final VoidCallback onAddNote;
+  final Function(ContactNote) onEditNote;
+  final Function(ContactNote) onDeleteNote;
+  final Function(ContactNote) onViewNote;
+
+  const _NotesSection({
+    required this.notes,
+    required this.onAddNote,
+    required this.onEditNote,
+    required this.onDeleteNote,
+    required this.onViewNote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final anonymityProvider = context.watch<AnonymityProvider>();
+    final isAnonymous = anonymityProvider.isAnonymousModeEnabled;
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Notes (${notes.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Colors.blue),
+                  onPressed: onAddNote,
+                  tooltip: 'Ajouter une note',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (notes.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'Aucune note',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ...notes.map((note) {
+                // Anonymiser le contenu si mode activé
+                final displayContent = isAnonymous
+                    ? note.content.replaceAll(RegExp(r'[a-zA-ZÀ-ÿ]{3,}'), '****')
+                    : note.content;
+
+                // Déterminer si l'action est en retard
+                final isOverdue = note.isActionItem &&
+                    note.dueDate != null &&
+                    note.dueDate!.isBefore(DateTime.now()) &&
+                    !note.isCompleted;
+
+                // Détecter les notes longues (transcripts)
+                final isLongNote = note.category == NoteCategory.transcript || note.content.length > 200;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: note.isPinned
+                      ? Colors.blue.shade50
+                      : (note.isActionItem ? Colors.orange.shade50 : Colors.amber.shade50),
+                  child: ListTile(
+                    leading: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(note.category.icon, style: const TextStyle(fontSize: 24)),
+                      ],
+                    ),
+                    onTap: isLongNote ? () => onViewNote(note) : null,
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            displayContent,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Badges
+                        if (note.isPinned)
+                          const Text('📌', style: TextStyle(fontSize: 16)),
+                        const SizedBox(width: 4),
+                        Text(note.importance.icon, style: const TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              app_date_utils.getRelativeDateText(note.createdAt),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            if (isLongNote) ...[
+                              const SizedBox(width: 8),
+                              const Text(
+                                '👁️ Appuyer pour lire',
+                                style: TextStyle(fontSize: 11, color: Colors.blue),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (note.isActionItem) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                note.isCompleted
+                                    ? Icons.check_circle
+                                    : Icons.radio_button_unchecked,
+                                size: 16,
+                                color: note.isCompleted ? Colors.green : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                note.dueDate != null
+                                    ? 'Échéance: ${note.dueDate!.day}/${note.dueDate!.month}'
+                                    : 'Pas d\'échéance',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isOverdue ? Colors.red : Colors.grey,
+                                  fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              if (isOverdue)
+                                const Text(
+                                  ' ⚠️ En retard',
+                                  style: TextStyle(fontSize: 11, color: Colors.red),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Bouton play si audioPath existe
+                        if (note.audioPath != null)
+                          IconButton(
+                            icon: Icon(
+                              note.audioPath == context.findAncestorStateOfType<_ContactDetailScreenState>()?._playingAudioPath &&
+                                  context.findAncestorStateOfType<_ContactDetailScreenState>()?._isPlaying == true
+                                  ? Icons.pause_circle
+                                  : Icons.play_circle,
+                              size: 28,
+                              color: Colors.blue,
+                            ),
+                            onPressed: () {
+                              context.findAncestorStateOfType<_ContactDetailScreenState>()?._toggleAudioPlayback(note.audioPath!);
+                            },
+                            tooltip: 'Écouter',
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () => onEditNote(note),
+                          tooltip: 'Modifier',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          onPressed: () => onDeleteNote(note),
+                          tooltip: 'Supprimer',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
     );
   }
 }

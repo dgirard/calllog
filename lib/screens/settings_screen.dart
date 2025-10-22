@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/backup_service.dart';
 import '../services/call_log_service.dart';
 import '../services/database_service.dart';
+import '../services/transcription_service.dart';
 import '../providers/anonymity_provider.dart';
 
 /// Écran des paramètres
@@ -21,16 +22,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Map<String, int>? _stats;
   DateTime? _lastSyncTime;
   int _syncDays = 30;
+  bool _isGeminiConfigured = false;
+  String? _geminiApiKey;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+    _loadGeminiConfig();
   }
 
   Future<void> _loadStats() async {
     final stats = await _backupService.getBackupStats();
     setState(() => _stats = stats);
+  }
+
+  Future<void> _loadGeminiConfig() async {
+    final isConfigured = await TranscriptionService.isConfigured();
+    final apiKey = await TranscriptionService.getApiKey();
+    setState(() {
+      _isGeminiConfigured = isConfigured;
+      _geminiApiKey = apiKey;
+    });
   }
 
   Future<void> _exportData() async {
@@ -241,6 +254,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _configureGeminiApi() async {
+    final controller = TextEditingController(text: _geminiApiKey ?? '');
+
+    final apiKey = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clé API Gemini'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pour activer la transcription audio automatique, configurez votre clé API Gemini.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Clé API',
+                hintText: 'AIzaSy...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+              minLines: 1,
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () {
+                // Ouvrir le lien pour obtenir une clé
+              },
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text(
+                'Obtenir une clé API',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          if (_isGeminiConfigured)
+            TextButton(
+              onPressed: () async {
+                await TranscriptionService.clearApiKey();
+                if (context.mounted) {
+                  Navigator.pop(context, '');
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Supprimer'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Tester et enregistrer'),
+          ),
+        ],
+      ),
+    );
+
+    if (apiKey != null && apiKey.isNotEmpty) {
+      setState(() => _isLoading = true);
+
+      // Tester la clé API
+      final isValid = await TranscriptionService.testApiKey(apiKey);
+
+      if (isValid) {
+        await TranscriptionService.saveApiKey(apiKey);
+        await _loadGeminiConfig();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Clé API configurée avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Clé API invalide. Vérifiez votre clé.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+
+      setState(() => _isLoading = false);
+    } else if (apiKey == '') {
+      // Clé supprimée
+      await _loadGeminiConfig();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Clé API supprimée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -462,6 +582,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 const SizedBox(height: 16),
+
+                // Transcription
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Transcription audio',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                ListTile(
+                  leading: Icon(
+                    _isGeminiConfigured ? Icons.check_circle : Icons.cloud_off,
+                    color: _isGeminiConfigured ? Colors.green : Colors.grey,
+                  ),
+                  title: const Text('Configuration Gemini API'),
+                  subtitle: Text(
+                    _isGeminiConfigured
+                        ? 'API configurée - Transcription activée'
+                        : 'Non configurée - Transcription désactivée',
+                  ),
+                  onTap: _configureGeminiApi,
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.blue.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Transcription automatique',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Configurez une clé API Gemini pour transcrire automatiquement '
+                          'vos enregistrements audio en texte. Gratuit jusqu\'à 1500 requêtes/jour.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
                 // Mode anonyme
                 const Divider(),

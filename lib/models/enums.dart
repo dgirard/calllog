@@ -35,6 +35,24 @@ enum ContactContext {
   birthday, // Contact pour anniversaire
 }
 
+/// Catégorie d'une note
+enum NoteCategory {
+  general,      // Note générale
+  preference,   // Préférence personnelle
+  gift,         // Cadeau donné/reçu
+  conversation, // Sujet de conversation
+  transcript,   // Transcript de conversation (long)
+  action,       // Action/Rappel
+  event,        // Événement
+}
+
+/// Importance d'une note
+enum NoteImportance {
+  low,    // Basse
+  medium, // Moyenne
+  high,   // Haute
+}
+
 /// Extensions pour faciliter la conversion et l'affichage
 
 extension CallFrequencyExtension on CallFrequency {
@@ -157,6 +175,92 @@ extension ContactContextExtension on ContactContext {
         return 'Normal';
       case ContactContext.birthday:
         return 'Anniversaire';
+    }
+  }
+}
+
+extension NoteCategoryExtension on NoteCategory {
+  String toJson() {
+    return toString().split('.').last;
+  }
+
+  static NoteCategory fromJson(String value) {
+    return NoteCategory.values.firstWhere(
+      (e) => e.toString().split('.').last == value,
+      orElse: () => NoteCategory.general,
+    );
+  }
+
+  String get displayName {
+    switch (this) {
+      case NoteCategory.general:
+        return 'Général';
+      case NoteCategory.preference:
+        return 'Préférence';
+      case NoteCategory.gift:
+        return 'Cadeau';
+      case NoteCategory.conversation:
+        return 'Conversation';
+      case NoteCategory.transcript:
+        return 'Transcript';
+      case NoteCategory.action:
+        return 'Action';
+      case NoteCategory.event:
+        return 'Événement';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case NoteCategory.general:
+        return '📌';
+      case NoteCategory.preference:
+        return '❤️';
+      case NoteCategory.gift:
+        return '🎁';
+      case NoteCategory.conversation:
+        return '💬';
+      case NoteCategory.transcript:
+        return '📝';
+      case NoteCategory.action:
+        return '🎯';
+      case NoteCategory.event:
+        return '📅';
+    }
+  }
+}
+
+extension NoteImportanceExtension on NoteImportance {
+  String toJson() {
+    return toString().split('.').last;
+  }
+
+  static NoteImportance fromJson(String value) {
+    return NoteImportance.values.firstWhere(
+      (e) => e.toString().split('.').last == value,
+      orElse: () => NoteImportance.medium,
+    );
+  }
+
+  String get displayName {
+    switch (this) {
+      case NoteImportance.low:
+        return 'Basse';
+      case NoteImportance.medium:
+        return 'Moyenne';
+      case NoteImportance.high:
+        return 'Haute';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case NoteImportance.low:
+        return '⚪';
+      case NoteImportance.medium:
+        return '🟡';
+      case NoteImportance.high:
+        return '🔴';
     }
   }
 }

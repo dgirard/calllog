@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/tracked_contact.dart';
 import '../models/contact_record.dart';
+import '../models/contact_note.dart';
 import '../models/enums.dart';
 
 /// Service singleton pour gérer la base de données SQLite
@@ -29,8 +30,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 4,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -69,6 +71,66 @@ class DatabaseService {
     await db.execute('''
       CREATE INDEX idx_tracked_contact_id ON contact_history(tracked_contact_id)
     ''');
+
+    // Table contact_notes
+    await db.execute('''
+      CREATE TABLE contact_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tracked_contact_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        audio_path TEXT,
+        category TEXT NOT NULL DEFAULT 'general',
+        importance TEXT NOT NULL DEFAULT 'medium',
+        is_pinned INTEGER NOT NULL DEFAULT 0,
+        is_action_item INTEGER NOT NULL DEFAULT 0,
+        due_date TEXT,
+        is_completed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        FOREIGN KEY (tracked_contact_id) REFERENCES tracked_contacts (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Index pour améliorer les performances
+    await db.execute('''
+      CREATE INDEX idx_note_contact_id ON contact_notes(tracked_contact_id)
+    ''');
+  }
+
+  /// Gère les migrations de version de la base de données
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Migration vers version 2: ajout de la table contact_notes
+      await db.execute('''
+        CREATE TABLE contact_notes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tracked_contact_id INTEGER NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT,
+          FOREIGN KEY (tracked_contact_id) REFERENCES tracked_contacts (id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE INDEX idx_note_contact_id ON contact_notes(tracked_contact_id)
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      // Migration vers version 3: ajout des nouvelles colonnes aux notes
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN category TEXT NOT NULL DEFAULT "general"');
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN importance TEXT NOT NULL DEFAULT "medium"');
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN is_action_item INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN due_date TEXT');
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN is_completed INTEGER NOT NULL DEFAULT 0');
+    }
+
+    if (oldVersion < 4) {
+      // Migration vers version 4: ajout de la colonne audio_path aux notes
+      await db.execute('ALTER TABLE contact_notes ADD COLUMN audio_path TEXT');
+    }
   }
 
   // ==================== CRUD TrackedContact ====================
@@ -275,6 +337,71 @@ class DatabaseService {
       }
     } catch (e) {
       throw Exception('Erreur lors de l\'enregistrement du contact: $e');
+    }
+  }
+
+  // ==================== CRUD ContactNote ====================
+
+  /// Insère une nouvelle note
+  Future<int> insertNote(ContactNote note) async {
+    try {
+      final db = await database;
+      return await db.insert(
+        'contact_notes',
+        note.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de l\'insertion de la note: $e');
+    }
+  }
+
+  /// Récupère toutes les notes pour un contact donné
+  /// Triées par: épinglées d'abord, puis par date de création décroissante
+  Future<List<ContactNote>> getNotes(int contactId) async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'contact_notes',
+        where: 'tracked_contact_id = ?',
+        whereArgs: [contactId],
+        orderBy: 'is_pinned DESC, created_at DESC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return ContactNote.fromMap(maps[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des notes: $e');
+    }
+  }
+
+  /// Met à jour une note existante
+  Future<int> updateNote(ContactNote note) async {
+    try {
+      final db = await database;
+      return await db.update(
+        'contact_notes',
+        note.toMap(),
+        where: 'id = ?',
+        whereArgs: [note.id],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour de la note: $e');
+    }
+  }
+
+  /// Supprime une note
+  Future<int> deleteNote(int noteId) async {
+    try {
+      final db = await database;
+      return await db.delete(
+        'contact_notes',
+        where: 'id = ?',
+        whereArgs: [noteId],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la suppression de la note: $e');
     }
   }
 

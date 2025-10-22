@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/tracked_contact.dart';
+import '../models/contact_note.dart';
 import '../models/enums.dart';
 import '../services/database_service.dart';
 import '../utils/priority_calculator.dart';
@@ -169,5 +170,17 @@ class ContactsProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Ajoute une note à un contact
+  Future<void> addNote(int contactId, ContactNote note) async {
+    try {
+      await _databaseService.insertNote(note);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 }

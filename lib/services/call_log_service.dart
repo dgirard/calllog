@@ -73,8 +73,8 @@ class CallLogService {
           continue;
         }
 
-        // Filtrer uniquement les appels sortants (type 2)
-        if (callType != 2) continue;
+        // Filtrer uniquement les appels sortants (type 2) et entrants (type 1)
+        if (callType != 1 && callType != 2) continue;
 
         // Filtrer uniquement les appels de plus de 10 secondes
         if (duration < 10) continue;

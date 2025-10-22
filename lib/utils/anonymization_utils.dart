@@ -1,24 +1,33 @@
 /// Utilitaires pour anonymiser les données sensibles en mode démo
 
 /// Anonymise un nom complet
-/// Garde le prénom, remplace le nom par des étoiles
+/// Garde la première lettre du prénom, tout le reste en étoiles
 /// Exemples:
-///   "Georges Girard" → "Georges ******"
-///   "Marie-Claire Dupont" → "Marie-Claire ******"
-///   "Jean" → "Jean"
+///   "Georges Girard" → "G****** ******"
+///   "Marie-Claire Dupont" → "M***********- ******"
+///   "Jean" → "J***"
 String anonymizeName(String fullName) {
   final parts = fullName.trim().split(' ');
 
   if (parts.isEmpty) return fullName;
-  if (parts.length == 1) return parts[0]; // Que le prénom
 
-  // Garder le prénom (tous les mots avant le dernier)
-  final firstName = parts.sublist(0, parts.length - 1).join(' ');
-  // Remplacer le nom par des étoiles (longueur du nom)
-  final lastName = parts.last;
-  final anonymizedLastName = '*' * lastName.length;
+  // Anonymiser chaque partie (prénom et nom)
+  final anonymizedParts = parts.map((part) {
+    if (part.isEmpty) return part;
 
-  return '$firstName $anonymizedLastName';
+    // Gérer les prénoms composés avec tiret (Marie-Claire)
+    if (part.contains('-')) {
+      return part.split('-').map((subPart) {
+        if (subPart.isEmpty) return subPart;
+        return subPart[0] + ('*' * (subPart.length - 1));
+      }).join('-');
+    }
+
+    // Garder première lettre + étoiles pour le reste
+    return part[0] + ('*' * (part.length - 1));
+  }).toList();
+
+  return anonymizedParts.join(' ');
 }
 
 /// Anonymise un numéro de téléphone
@@ -60,8 +69,19 @@ String anonymizePhoneNumber(String phoneNumber) {
   return result.toString();
 }
 
-/// Anonymise un prénom seul (retourne tel quel)
+/// Anonymise un prénom seul
+/// Garde la première lettre, tout le reste en étoiles
 /// Utilisé pour les messages d'anniversaire par exemple
 String anonymizeFirstName(String firstName) {
-  return firstName; // On garde le prénom tel quel
+  if (firstName.isEmpty) return firstName;
+
+  // Gérer les prénoms composés avec tiret (Marie-Claire)
+  if (firstName.contains('-')) {
+    return firstName.split('-').map((subPart) {
+      if (subPart.isEmpty) return subPart;
+      return subPart[0] + ('*' * (subPart.length - 1));
+    }).join('-');
+  }
+
+  return firstName[0] + ('*' * (firstName.length - 1));
 }
