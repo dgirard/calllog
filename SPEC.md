@@ -331,5 +331,82 @@ Tri de la liste :
 
 ---
 
-**Version** : 1.2
-**Date** : 2025-10-04
+## 12. Nouveautés version 1.3 - Transcription audio et mode anonyme
+
+### Fonctionnalités ajoutées :
+
+#### Transcription audio avec Gemini 2.5 Flash
+- ✅ **Enregistrement de notes vocales** : Enregistrement audio directement depuis la fiche d'un contact
+- ✅ **Transcription automatique** : Utilisation de l'API Google Generative AI (Gemini 2.5 Flash) pour transcrire les notes audio en texte
+- ✅ **Stockage sécurisé** : La clé API Gemini est stockée de manière sécurisée avec `flutter_secure_storage`
+- ✅ **Lecture des enregistrements** : Écoute des notes audio enregistrées
+- ✅ **Interface intuitive** : Boutons d'enregistrement, lecture et transcription dans l'écran de détail du contact
+- ✅ **Gestion des erreurs** : Messages clairs si la transcription échoue ou si la clé API n'est pas configurée
+- ✅ **Configuration dans Paramètres** : Écran dédié pour saisir et tester la clé API Gemini
+
+**Cas d'usage** :
+- Enregistrer rapidement des notes vocales après un appel important
+- Transcrire automatiquement le contenu pour consultation ultérieure
+- Garder une trace écrite des conversations (réunions, rendez-vous médicaux, etc.)
+
+**Packages utilisés** :
+- `google_generative_ai: ^0.4.0` - API Gemini pour transcription
+- `flutter_secure_storage: ^9.0.0` - Stockage sécurisé de la clé API
+- `record: ^5.1.2` - Enregistrement audio (formats M4A, OPUS, WAV, MP3)
+- `audioplayers: ^5.2.1` - Lecture audio
+- `crypto: ^3.0.3` - Utilitaires cryptographiques
+
+**Obtenir une clé API Gemini** :
+1. Se connecter à [Google AI Studio](https://aistudio.google.com/apikey)
+2. Créer une nouvelle clé API
+3. Copier la clé dans les Paramètres de l'application
+
+#### Mode anonyme
+- ✅ **Anonymisation des données** : Masquage des informations personnelles pour démonstrations/captures d'écran
+- ✅ **Noms anonymisés** : Remplacement des noms réels par des pseudonymes génériques ("Contact A", "Contact B", etc.)
+- ✅ **Numéros masqués** : Affichage de numéros factices au lieu des vrais numéros
+- ✅ **Toggle rapide** : Activation/désactivation instantanée depuis les Paramètres
+- ✅ **Persistance** : Le mode reste actif entre les sessions
+- ✅ **Icône de notification** : Badge visible dans l'AppBar quand le mode est actif
+
+**Cas d'usage** :
+- Création de tutoriels vidéo sans exposer les données personnelles
+- Captures d'écran pour documentation ou portfolio
+- Démonstrations de l'application à des tiers
+- Tests en public (conférences, présentations)
+
+**Provider dédié** : `AnonymityProvider` pour gérer l'état global du mode anonyme
+
+#### Partage de texte
+- ✅ **Réception de texte partagé** : L'application peut recevoir du texte depuis d'autres applications Android
+- ✅ **Sélection du contact** : Écran de sélection pour choisir à quel contact associer le texte partagé
+- ✅ **Ajout automatique comme note** : Le texte partagé est enregistré comme note du contact
+- ✅ **MethodChannel Android** : Communication native entre Android et Flutter
+
+**Cas d'usage** :
+- Partager une adresse email depuis une app vers un contact CallLog
+- Transférer des notes depuis une app de prise de notes
+- Enregistrer des informations importantes liées à un contact
+
+**Implémentation** :
+- `ShareReceiverScreen` : Écran de réception et sélection du contact
+- Configuration dans `MainActivity.kt` pour intercepter les intents de partage Android
+
+### Améliorations techniques :
+- Utilisation de `flutter_secure_storage` pour protéger les données sensibles (clés API)
+- Architecture extensible pour supporter d'autres services de transcription à l'avenir
+- Gestion des permissions audio (si nécessaire selon la plateforme)
+- Support de multiples formats audio (M4A, OPUS, WAV, MP3)
+
+### À venir (Phase 3) :
+- Reconnaissance vocale en temps réel pendant l'enregistrement
+- Résumé automatique des notes avec IA
+- Traduction automatique des transcriptions
+- Recherche dans les transcriptions
+- Export des transcriptions en PDF
+- Partage de notes entre contacts
+
+---
+
+**Version** : 1.3
+**Date** : 2025-10-23
