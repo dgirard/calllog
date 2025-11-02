@@ -3,6 +3,8 @@ import 'package:path/path.dart';
 import '../models/tracked_contact.dart';
 import '../models/contact_record.dart';
 import '../models/contact_note.dart';
+import '../models/event.dart';
+import '../models/event_contact.dart';
 import '../models/enums.dart';
 
 /// Service singleton pour gérer la base de données SQLite
@@ -30,7 +32,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -95,6 +97,42 @@ class DatabaseService {
     await db.execute('''
       CREATE INDEX idx_note_contact_id ON contact_notes(tracked_contact_id)
     ''');
+
+    // Table events
+    await db.execute('''
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        category TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Table event_contacts (relation many-to-many)
+    await db.execute('''
+      CREATE TABLE event_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        tracked_contact_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
+        FOREIGN KEY (tracked_contact_id) REFERENCES tracked_contacts (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Index pour améliorer les performances
+    await db.execute('''
+      CREATE INDEX idx_event_id ON event_contacts(event_id)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_event_contact_id ON event_contacts(tracked_contact_id)
+    ''');
   }
 
   /// Gère les migrations de version de la base de données
@@ -130,6 +168,42 @@ class DatabaseService {
     if (oldVersion < 4) {
       // Migration vers version 4: ajout de la colonne audio_path aux notes
       await db.execute('ALTER TABLE contact_notes ADD COLUMN audio_path TEXT');
+    }
+
+    if (oldVersion < 5) {
+      // Migration vers version 5: ajout des tables events et event_contacts
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT,
+          start_date TEXT NOT NULL,
+          end_date TEXT,
+          category TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS event_contacts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL,
+          tracked_contact_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
+          FOREIGN KEY (tracked_contact_id) REFERENCES tracked_contacts (id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_event_id ON event_contacts(event_id)
+      ''');
+
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_event_contact_id ON event_contacts(tracked_contact_id)
+      ''');
     }
   }
 
@@ -402,6 +476,282 @@ class DatabaseService {
       );
     } catch (e) {
       throw Exception('Erreur lors de la suppression de la note: $e');
+    }
+  }
+
+  // ==================== CRUD Event ====================
+
+  /// Insère un nouvel événement
+  Future<int> insertEvent(Event event) async {
+    try {
+      final db = await database;
+      return await db.insert(
+        'events',
+        event.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de l\'insertion de l\'événement: $e');
+    }
+  }
+
+  /// Récupère tous les événements
+  Future<List<Event>> getEvents() async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'events',
+        orderBy: 'start_date DESC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return Event.fromMap(maps[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des événements: $e');
+    }
+  }
+
+  /// Récupère un événement par son ID
+  Future<Event?> getEventById(int id) async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'events',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      if (maps.isEmpty) return null;
+      return Event.fromMap(maps.first);
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération de l\'événement: $e');
+    }
+  }
+
+  /// Met à jour un événement existant
+  Future<int> updateEvent(Event event) async {
+    try {
+      final db = await database;
+      return await db.update(
+        'events',
+        event.toMap(),
+        where: 'id = ?',
+        whereArgs: [event.id],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour de l\'événement: $e');
+    }
+  }
+
+  /// Supprime un événement et ses relations
+  Future<int> deleteEvent(int id) async {
+    try {
+      final db = await database;
+
+      // Supprimer d'abord les relations (cascade normalement mais par sécurité)
+      await db.delete(
+        'event_contacts',
+        where: 'event_id = ?',
+        whereArgs: [id],
+      );
+
+      // Supprimer l'événement
+      return await db.delete(
+        'events',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la suppression de l\'événement: $e');
+    }
+  }
+
+  /// Récupère les événements à venir
+  Future<List<Event>> getUpcomingEvents() async {
+    try {
+      final db = await database;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day).toIso8601String();
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'events',
+        where: 'start_date >= ? AND status = ?',
+        whereArgs: [today, EventStatus.active.toJson()],
+        orderBy: 'start_date ASC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return Event.fromMap(maps[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des événements à venir: $e');
+    }
+  }
+
+  /// Récupère les événements passés
+  Future<List<Event>> getPastEvents() async {
+    try {
+      final db = await database;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day).toIso8601String();
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'events',
+        where: '(end_date < ? OR (end_date IS NULL AND start_date < ?)) AND status = ?',
+        whereArgs: [today, today, EventStatus.active.toJson()],
+        orderBy: 'start_date DESC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return Event.fromMap(maps[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des événements passés: $e');
+    }
+  }
+
+  /// Récupère les événements archivés
+  Future<List<Event>> getArchivedEvents() async {
+    try {
+      final db = await database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'events',
+        where: 'status = ?',
+        whereArgs: [EventStatus.archived.toJson()],
+        orderBy: 'start_date DESC',
+      );
+
+      return List.generate(maps.length, (i) {
+        return Event.fromMap(maps[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des événements archivés: $e');
+    }
+  }
+
+  // ==================== CRUD EventContact ====================
+
+  /// Ajoute un contact à un événement
+  Future<int> addContactToEvent(int eventId, int contactId) async {
+    try {
+      final db = await database;
+
+      // Vérifier si la relation existe déjà
+      final existing = await db.query(
+        'event_contacts',
+        where: 'event_id = ? AND tracked_contact_id = ?',
+        whereArgs: [eventId, contactId],
+      );
+
+      if (existing.isNotEmpty) {
+        return existing.first['id'] as int;
+      }
+
+      // Créer la relation
+      final eventContact = EventContact(
+        eventId: eventId,
+        trackedContactId: contactId,
+      );
+
+      return await db.insert(
+        'event_contacts',
+        eventContact.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de l\'ajout du contact à l\'événement: $e');
+    }
+  }
+
+  /// Retire un contact d'un événement
+  Future<int> removeContactFromEvent(int eventId, int contactId) async {
+    try {
+      final db = await database;
+
+      return await db.delete(
+        'event_contacts',
+        where: 'event_id = ? AND tracked_contact_id = ?',
+        whereArgs: [eventId, contactId],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors du retrait du contact de l\'événement: $e');
+    }
+  }
+
+  /// Supprime toutes les associations de contacts pour un événement
+  Future<int> deleteEventContacts(int eventId) async {
+    try {
+      final db = await database;
+      return await db.delete(
+        'event_contacts',
+        where: 'event_id = ?',
+        whereArgs: [eventId],
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la suppression des contacts de l\'événement: $e');
+    }
+  }
+
+  /// Récupère les contacts d'un événement
+  Future<List<TrackedContact>> getEventContacts(int eventId) async {
+    try {
+      final db = await database;
+
+      // Récupérer les IDs des contacts associés
+      final List<Map<String, dynamic>> relations = await db.query(
+        'event_contacts',
+        where: 'event_id = ?',
+        whereArgs: [eventId],
+      );
+
+      if (relations.isEmpty) return [];
+
+      // Récupérer les contacts
+      final contactIds = relations.map((r) => r['tracked_contact_id']).toList();
+      final List<Map<String, dynamic>> contacts = await db.query(
+        'tracked_contacts',
+        where: 'id IN (${contactIds.map((_) => '?').join(', ')})',
+        whereArgs: contactIds,
+      );
+
+      return List.generate(contacts.length, (i) {
+        return TrackedContact.fromMap(contacts[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des contacts de l\'événement: $e');
+    }
+  }
+
+  /// Récupère les événements d'un contact
+  Future<List<Event>> getContactEvents(int contactId) async {
+    try {
+      final db = await database;
+
+      // Récupérer les IDs des événements associés
+      final List<Map<String, dynamic>> relations = await db.query(
+        'event_contacts',
+        where: 'tracked_contact_id = ?',
+        whereArgs: [contactId],
+      );
+
+      if (relations.isEmpty) return [];
+
+      // Récupérer les événements
+      final eventIds = relations.map((r) => r['event_id']).toList();
+      final List<Map<String, dynamic>> events = await db.query(
+        'events',
+        where: 'id IN (${eventIds.map((_) => '?').join(', ')})',
+        whereArgs: eventIds,
+        orderBy: 'start_date DESC',
+      );
+
+      return List.generate(events.length, (i) {
+        return Event.fromMap(events[i]);
+      });
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des événements du contact: $e');
     }
   }
 

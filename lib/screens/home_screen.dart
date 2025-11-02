@@ -114,6 +114,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('CallLog'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.event),
+            onPressed: () => Navigator.pushNamed(context, '/events'),
+            tooltip: 'Événements',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.pushNamed(context, '/settings'),
             tooltip: 'Paramètres',

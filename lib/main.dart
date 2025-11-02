@@ -5,12 +5,17 @@ import 'package:provider/provider.dart';
 import 'providers/contacts_provider.dart';
 import 'providers/filters_provider.dart';
 import 'providers/anonymity_provider.dart';
+import 'providers/events_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_contact_screen.dart';
 import 'screens/contact_detail_screen.dart';
 import 'screens/filters_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/share_receiver_screen.dart';
+import 'screens/events_screen.dart';
+import 'screens/add_event_screen.dart';
+import 'screens/event_detail_screen.dart';
+import 'screens/edit_event_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -79,6 +84,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => ContactsProvider()),
         ChangeNotifierProvider(create: (_) => FiltersProvider()),
         ChangeNotifierProvider(create: (_) => AnonymityProvider()),
+        ChangeNotifierProvider(create: (_) => EventsProvider()),
       ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
@@ -123,6 +129,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             case '/settings':
               return MaterialPageRoute(
                 builder: (_) => const SettingsScreen(),
+              );
+
+            case '/events':
+              return MaterialPageRoute(
+                builder: (_) => const EventsScreen(),
+              );
+
+            case '/add-event':
+              return MaterialPageRoute(
+                builder: (_) => const AddEventScreen(),
+              );
+
+            case '/event-detail':
+              final eventId = settings.arguments as int;
+              return MaterialPageRoute(
+                builder: (_) => EventDetailScreen(eventId: eventId),
+              );
+
+            case '/edit-event':
+              final eventId = settings.arguments as int;
+              return MaterialPageRoute(
+                builder: (_) => EditEventScreen(eventId: eventId),
               );
 
             default:

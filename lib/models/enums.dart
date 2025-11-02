@@ -264,3 +264,127 @@ extension NoteImportanceExtension on NoteImportance {
     }
   }
 }
+
+/// Catégorie d'un événement
+enum EventCategory {
+  vacation,    // Vacances
+  weekend,     // Week-end
+  shopping,    // Courses
+  birthday,    // Anniversaires
+  almanac,     // Almanach
+  fullMoon,    // Pleine lune
+  holiday,     // Jour férié
+  medical,     // Médical/Santé
+  meeting,     // Réunion/RDV
+  restaurant,  // Restaurant
+  conference,  // Conférence
+  other,       // Autre
+}
+
+/// Statut d'un événement
+enum EventStatus {
+  active,    // Actif
+  archived,  // Archivé
+}
+
+extension EventCategoryExtension on EventCategory {
+  String toJson() {
+    return toString().split('.').last;
+  }
+
+  static EventCategory fromJson(String value) {
+    return EventCategory.values.firstWhere(
+      (e) => e.toString().split('.').last == value,
+      orElse: () => EventCategory.other,
+    );
+  }
+
+  String get displayName {
+    switch (this) {
+      case EventCategory.vacation:
+        return 'Vacances';
+      case EventCategory.weekend:
+        return 'Week-end';
+      case EventCategory.shopping:
+        return 'Courses';
+      case EventCategory.birthday:
+        return 'Anniversaire';
+      case EventCategory.almanac:
+        return 'Almanach';
+      case EventCategory.fullMoon:
+        return 'Pleine lune';
+      case EventCategory.holiday:
+        return 'Jour férié';
+      case EventCategory.medical:
+        return 'Médical';
+      case EventCategory.meeting:
+        return 'Réunion';
+      case EventCategory.restaurant:
+        return 'Restaurant';
+      case EventCategory.conference:
+        return 'Conférence';
+      case EventCategory.other:
+        return 'Autre';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case EventCategory.vacation:
+        return '🏖️';
+      case EventCategory.weekend:
+        return '🏡';
+      case EventCategory.shopping:
+        return '🛒';
+      case EventCategory.birthday:
+        return '🎂';
+      case EventCategory.almanac:
+        return '📅';
+      case EventCategory.fullMoon:
+        return '🌕';
+      case EventCategory.holiday:
+        return '🎊';
+      case EventCategory.medical:
+        return '⚕️';
+      case EventCategory.meeting:
+        return '🤝';
+      case EventCategory.restaurant:
+        return '🍽️';
+      case EventCategory.conference:
+        return '🎤';
+      case EventCategory.other:
+        return '📌';
+    }
+  }
+}
+
+extension EventStatusExtension on EventStatus {
+  String toJson() {
+    return toString().split('.').last;
+  }
+
+  static EventStatus fromJson(String value) {
+    return EventStatus.values.firstWhere(
+      (e) => e.toString().split('.').last == value,
+      orElse: () => EventStatus.active,
+    );
+  }
+
+  String get displayName {
+    switch (this) {
+      case EventStatus.active:
+        return 'Actif';
+      case EventStatus.archived:
+        return 'Archivé';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case EventStatus.active:
+        return '✅';
+      case EventStatus.archived:
+        return '📦';
+    }
+  }
+}
