@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/weekly_summary.dart';
+import '../models/tts_provider.dart';
 import '../services/weekly_summary_service.dart';
 import '../services/text_to_speech_service.dart';
+import '../services/gemini_audio_service.dart';
 
 /// Provider pour gérer l'état du résumé hebdomadaire
 class WeeklySummaryProvider extends ChangeNotifier {
   final WeeklySummaryService _summaryService = WeeklySummaryService();
-  final TextToSpeechService _ttsService = TextToSpeechService();
+  final TextToSpeechService _localTtsService = TextToSpeechService();
+  final GeminiAudioService _geminiAudioService = GeminiAudioService();
 
   WeeklySummary? _weeklySummary;
   String? _summaryText;
@@ -15,6 +19,7 @@ class WeeklySummaryProvider extends ChangeNotifier {
   bool _isPlaying = false;
   String? _error;
   SummaryType _currentType = SummaryType.weekly;
+  TTSProvider _ttsProvider = TTSProvider.local;
 
   // Getters
   WeeklySummary? get weeklySummary => _weeklySummary;
@@ -24,16 +29,49 @@ class WeeklySummaryProvider extends ChangeNotifier {
   bool get isPlaying => _isPlaying;
   String? get error => _error;
   SummaryType get currentType => _currentType;
+  TTSProvider get ttsProvider => _ttsProvider;
   bool get hasData => _weeklySummary != null && _weeklySummary!.hasContent;
 
   /// Initialise le provider
   Future<void> initialize() async {
     try {
-      await _ttsService.initialize();
-      await _ttsService.setOptimalFrenchVoice();
+      // Charger le provider TTS préféré
+      await loadTTSProvider();
+
+      // Initialiser le service TTS local
+      await _localTtsService.initialize();
+      await _localTtsService.setOptimalFrenchVoice();
+
+      // Initialiser Gemini Audio si nécessaire
+      if (_ttsProvider == TTSProvider.geminiLive) {
+        await _geminiAudioService.connect();
+      }
     } catch (e) {
       print('Erreur initialisation TTS: $e');
     }
+  }
+
+  /// Charge le provider TTS depuis les préférences
+  Future<void> loadTTSProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    final providerStr = prefs.getString('tts_provider') ?? 'local';
+    _ttsProvider = providerStr == 'geminiLive' ? TTSProvider.geminiLive : TTSProvider.local;
+    notifyListeners();
+  }
+
+  /// Change le provider TTS
+  Future<void> setTTSProvider(TTSProvider provider) async {
+    _ttsProvider = provider;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('tts_provider', provider == TTSProvider.geminiLive ? 'geminiLive' : 'local');
+
+    // Connecter à Gemini si nécessaire
+    if (provider == TTSProvider.geminiLive) {
+      await _geminiAudioService.connect();
+    }
+
+    notifyListeners();
   }
 
   /// Change le type de résumé
@@ -110,10 +148,16 @@ class WeeklySummaryProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _ttsService.speak(_summaryText!);
-      // Le TTS notifiera quand la lecture sera terminée via les handlers
+      // Utiliser le provider TTS sélectionné
+      if (_ttsProvider == TTSProvider.geminiLive) {
+        await _geminiAudioService.speakSimple(_summaryText!);
+      } else {
+        await _localTtsService.speak(_summaryText!);
+      }
     } catch (e) {
       _error = 'Erreur lors de la lecture: $e';
+      print('Erreur TTS: $e');
+    } finally {
       _isPlaying = false;
       notifyListeners();
     }
@@ -121,14 +165,22 @@ class WeeklySummaryProvider extends ChangeNotifier {
 
   /// Met en pause la lecture
   Future<void> pauseSummary() async {
-    await _ttsService.pause();
+    if (_ttsProvider == TTSProvider.local) {
+      await _localTtsService.pause();
+    } else {
+      await _geminiAudioService.stop();
+    }
     _isPlaying = false;
     notifyListeners();
   }
 
   /// Arrête la lecture
   Future<void> stopSummary() async {
-    await _ttsService.stop();
+    if (_ttsProvider == TTSProvider.local) {
+      await _localTtsService.stop();
+    } else {
+      await _geminiAudioService.stop();
+    }
     _isPlaying = false;
     notifyListeners();
   }
@@ -146,19 +198,25 @@ class WeeklySummaryProvider extends ChangeNotifier {
     }
   }
 
-  /// Configure la vitesse de lecture
+  /// Configure la vitesse de lecture (local uniquement)
   Future<void> setSpeechRate(double rate) async {
-    await _ttsService.setSpeechRate(rate);
+    if (_ttsProvider == TTSProvider.local) {
+      await _localTtsService.setSpeechRate(rate);
+    }
   }
 
-  /// Configure le volume
+  /// Configure le volume (local uniquement)
   Future<void> setVolume(double volume) async {
-    await _ttsService.setVolume(volume);
+    if (_ttsProvider == TTSProvider.local) {
+      await _localTtsService.setVolume(volume);
+    }
   }
 
-  /// Configure la tonalité
+  /// Configure la tonalité (local uniquement)
   Future<void> setPitch(double pitch) async {
-    await _ttsService.setPitch(pitch);
+    if (_ttsProvider == TTSProvider.local) {
+      await _localTtsService.setPitch(pitch);
+    }
   }
 
   /// Génère un résumé basique sans IA
@@ -192,7 +250,8 @@ class WeeklySummaryProvider extends ChangeNotifier {
   /// Nettoie les ressources
   @override
   void dispose() {
-    _ttsService.dispose();
+    _localTtsService.dispose();
+    _geminiAudioService.dispose();
     super.dispose();
   }
 

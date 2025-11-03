@@ -80,6 +80,9 @@ dependencies:
   # Speech recognition for voice commands
   speech_to_text: ^7.0.0
 
+  # WebSocket for Gemini Live API
+  web_socket_channel: ^3.0.1
+
 dependency_overrides:
   record_linux: ^1.2.1
 

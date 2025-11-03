@@ -150,11 +150,11 @@ class TextToSpeechService {
 
   /// Retourne les voix françaises disponibles
   Future<List<Map<String, String>>> getFrenchVoices() async {
-    final voices = await _tts.getVoices;
+    final voices = await _tts.getVoices as List<dynamic>;
     return voices
         .where((voice) =>
-            voice['locale']?.toString().startsWith('fr') ?? false)
-        .map((voice) => Map<String, String>.from(voice))
+            (voice as Map)['locale']?.toString().startsWith('fr') ?? false)
+        .map((voice) => Map<String, String>.from(voice as Map))
         .toList();
   }
 

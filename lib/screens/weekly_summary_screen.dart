@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/weekly_summary_provider.dart';
 import '../models/weekly_summary.dart';
 import '../models/enums.dart';
+import '../models/tts_provider.dart';
 import '../utils/birthday_utils.dart';
 import '../widgets/empty_state.dart';
 
@@ -210,6 +211,10 @@ class _WeeklySummaryScreenState extends State<WeeklySummaryScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Sélecteur de voix
+            _buildVoiceSelector(provider),
+            const SizedBox(height: 16),
+
             // Boutons de contrôle
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -271,6 +276,68 @@ class _WeeklySummaryScreenState extends State<WeeklySummaryScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Construit le sélecteur de voix
+  Widget _buildVoiceSelector(WeeklySummaryProvider provider) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            provider.ttsProvider == TTSProvider.geminiLive
+                ? Icons.auto_awesome
+                : Icons.volume_up,
+            size: 20,
+            color: provider.ttsProvider == TTSProvider.geminiLive
+                ? Colors.purple
+                : Colors.grey[600],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Voix : ',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          DropdownButton<TTSProvider>(
+            value: provider.ttsProvider,
+            underline: Container(),
+            isDense: true,
+            items: TTSProvider.values.map((provider) {
+              return DropdownMenuItem(
+                value: provider,
+                child: Row(
+                  children: [
+                    Text(
+                      provider.icon,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      provider.displayName,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (newProvider) {
+              if (newProvider != null) {
+                provider.setTTSProvider(newProvider);
+              }
+            },
+          ),
+        ],
       ),
     );
   }
