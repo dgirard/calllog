@@ -74,6 +74,12 @@ dependencies:
   # Calendar view for events
   table_calendar: ^3.1.0
 
+  # Text-to-speech for weekly assistant
+  flutter_tts: ^4.0.2
+
+  # Speech recognition for voice commands
+  speech_to_text: ^7.0.0
+
 dependency_overrides:
   record_linux: ^1.2.1
 

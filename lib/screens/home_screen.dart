@@ -119,6 +119,11 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Événements',
           ),
           IconButton(
+            icon: const Icon(Icons.assistant),
+            onPressed: () => Navigator.pushNamed(context, '/weekly-summary'),
+            tooltip: 'Assistant hebdomadaire',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.pushNamed(context, '/settings'),
             tooltip: 'Paramètres',

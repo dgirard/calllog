@@ -6,6 +6,7 @@ import 'providers/contacts_provider.dart';
 import 'providers/filters_provider.dart';
 import 'providers/anonymity_provider.dart';
 import 'providers/events_provider.dart';
+import 'providers/weekly_summary_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_contact_screen.dart';
 import 'screens/contact_detail_screen.dart';
@@ -16,6 +17,7 @@ import 'screens/events_screen.dart';
 import 'screens/add_event_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/edit_event_screen.dart';
+import 'screens/weekly_summary_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -85,6 +87,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => FiltersProvider()),
         ChangeNotifierProvider(create: (_) => AnonymityProvider()),
         ChangeNotifierProvider(create: (_) => EventsProvider()),
+        ChangeNotifierProvider(create: (_) => WeeklySummaryProvider()),
       ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
@@ -151,6 +154,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               final eventId = settings.arguments as int;
               return MaterialPageRoute(
                 builder: (_) => EditEventScreen(eventId: eventId),
+              );
+
+            case '/weekly-summary':
+              return MaterialPageRoute(
+                builder: (_) => const WeeklySummaryScreen(),
               );
 
             default:
